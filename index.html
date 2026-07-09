@@ -1,0 +1,3745 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>매장 운영 대시보드</title>
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="매장 운영">
+<meta name="theme-color" content="#1C2331">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg:#EEF0F3;
+    --panel:#FFFFFF;
+    --ink:#1C2331;
+    --ink-soft:#5A6274;
+    --brass:#C9962C;
+    --brass-dark:#A87A1E;
+    --in-green:#2F7D5D;
+    --in-green-soft:#E4F1EC;
+    --out-clay:#B24C32;
+    --out-clay-soft:#F7E8E3;
+    --muted:#8A93A3;
+    --line:#DDE1E7;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Noto Sans KR', sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  .num{font-family:'Space Grotesk', 'Noto Sans KR', sans-serif;}
+  .hidden{display:none !important;}
+
+  .app{max-width:1240px;margin:0 auto;padding:20px 20px 60px;}
+
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--ink);color:#fff;
+    border-radius:var(--radius);
+    padding:16px 20px;
+    gap:16px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--brass);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;flex:none;
+  }
+  .brand-title{font-weight:700;font-size:16px;}
+  .brand-sub{font-size:12px;color:#B9C0CC;}
+  .live-clock{font-family:'Space Grotesk';font-size:26px;font-weight:600;letter-spacing:1px;}
+  .tabs{display:flex;gap:6px;background:rgba(255,255,255,0.08);padding:4px;border-radius:999px;}
+  .tab-btn{
+    border:none;background:transparent;color:#B9C0CC;
+    padding:8px 16px;border-radius:999px;font-size:13px;font-weight:700;
+    cursor:pointer;font-family:inherit;
+  }
+  .tab-btn.active{background:var(--brass);color:var(--ink);}
+
+  main{margin-top:20px;}
+  .view{}
+
+  .empty{
+    text-align:center;color:var(--muted);padding:40px 20px;
+    background:var(--panel);border-radius:var(--radius);border:1px dashed var(--line);
+  }
+  .empty button{
+    margin-top:10px;border:none;background:var(--brass);color:var(--ink);
+    padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer;
+  }
+
+  .card-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+    gap:14px;margin-top:18px;
+  }
+  .emp-card{
+    position:relative;
+    background:var(--panel);
+    border-radius:12px;
+    padding:22px 14px 16px;
+    text-align:center;
+    border:1px solid var(--line);
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .emp-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(28,35,49,0.08);}
+  .emp-card::before{
+    content:"";
+    position:absolute;top:0;left:50%;transform:translate(-50%,-50%);
+    width:22px;height:22px;border-radius:50%;
+    background:var(--bg);border:1px solid var(--line);
+  }
+  .emp-card .name{font-weight:700;font-size:15px;margin-bottom:8px;}
+  .emp-card .status{
+    display:inline-block;font-size:11px;font-weight:700;
+    padding:3px 9px;border-radius:999px;
+  }
+  .status.in{background:var(--in-green-soft);color:var(--in-green);}
+  .status.out{background:var(--out-clay-soft);color:var(--out-clay);}
+  .status.none{background:#EEF0F3;color:var(--muted);}
+  .emp-card .last-time{margin-top:6px;font-size:11px;color:var(--muted);font-family:'Space Grotesk';}
+  .emp-card.add-card{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:1.5px dashed var(--line);background:transparent;color:var(--muted);
+    font-weight:700;font-size:14px;min-height:88px;
+  }
+  .emp-card.add-card:hover{border-color:var(--brass);color:var(--brass-dark);}
+  .emp-card.add-card .plus{font-size:22px;line-height:1;margin-bottom:4px;font-weight:400;}
+
+  .dept-sections{
+    display:grid;grid-template-columns:repeat(auto-fit, minmax(180px,1fr));
+    align-items:start;gap:16px;margin-top:4px;
+  }
+  .dept-section{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;min-width:0;
+  }
+  .dept-section .card-grid{
+    grid-template-columns:1fr;
+    max-height:440px;overflow-y:auto;padding-right:2px;
+  }
+  .dept-heading{
+    font-size:13px;font-weight:900;color:var(--ink-soft);
+    display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-left:2px;
+  }
+  .dept-heading .count{font-family:'Space Grotesk';font-weight:600;color:var(--muted);font-size:12px;}
+  .dept-pill{
+    display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;
+    border-radius:999px;background:var(--bg);color:var(--ink-soft);
+  }
+  .dob-missing{margin-top:4px;font-size:10px;color:var(--out-clay);font-weight:700;}
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(28,35,49,0.55);
+    display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;
+  }
+  #confirmOverlay{ z-index:70; }
+  .modal{
+    background:var(--panel);border-radius:16px;padding:28px 26px;
+    width:100%;max-width:320px;text-align:center;position:relative;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25);
+  }
+  .modal-name{font-size:19px;font-weight:900;}
+  .verify-label{font-size:13px;color:var(--ink-soft);margin:14px 0 10px;line-height:1.55;}
+  .dob-field{
+    width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;
+    font-family:'Space Grotesk';font-size:22px;text-align:center;letter-spacing:6px;box-sizing:border-box;
+  }
+  .verify-blocked{font-size:13px;color:var(--out-clay);font-weight:700;line-height:1.6;margin:18px 0;}
+  .modal-time{font-family:'Space Grotesk';font-size:32px;font-weight:600;margin:10px 0 20px;color:var(--ink-soft);}
+  .modal-actions{display:flex;flex-direction:column;gap:10px;}
+  .leave-apply-link{
+    display:block;width:100%;margin-top:10px;border:none;background:transparent;
+    color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;font-family:inherit;
+  }
+  .quick-amount-btn.selected{border-color:var(--brass);background:rgba(201,150,44,0.14);color:var(--brass-dark);}
+  .punch-btn{
+    border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;
+    cursor:pointer;font-family:inherit;color:#fff;
+  }
+  .punch-btn.in{background:var(--in-green);}
+  .punch-btn.out{background:var(--out-clay);}
+  .punch-btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .modal-close{
+    margin-top:14px;border:none;background:transparent;color:var(--muted);
+    font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;
+  }
+  .stamp-fx{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    pointer-events:none;
+  }
+  .stamp-fx .ring{
+    width:120px;height:120px;border-radius:50%;
+    border:5px solid var(--brass);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:14px;color:var(--brass-dark);
+    background:rgba(255,255,255,0.9);
+    animation:stampDown .5s ease-out;
+  }
+  @keyframes stampDown{
+    0%{transform:scale(2.2) rotate(-14deg);opacity:0;}
+    60%{transform:scale(0.95) rotate(-6deg);opacity:1;}
+    100%{transform:scale(1) rotate(-6deg);opacity:1;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .stamp-fx .ring{animation:none;}
+    .emp-card{transition:none;}
+  }
+
+  .admin-grid{display:grid;grid-template-columns:270px 1fr;gap:16px;align-items:start;}
+  @media (max-width:720px){.admin-grid{grid-template-columns:1fr;}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+  .panel h3{margin:0 0 12px;font-size:14px;}
+  .inline-form{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .inline-form input, .inline-form select{
+    flex:1 1 90px;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;
+  }
+  .inline-form button{
+    flex:0 0 auto;border:none;background:var(--ink);color:#fff;padding:0 14px;border-radius:8px;cursor:pointer;font-weight:700;
+  }
+  .inline-date-field{
+    flex:1 1 145px;min-width:0;display:flex;flex-direction:column;gap:3px;
+    font-size:10px;color:var(--muted);font-weight:700;
+  }
+  .inline-form .inline-date-field input{
+    width:100%;flex:none;min-width:0;padding:9px 10px;border:1px solid var(--line);
+    border-radius:8px;font-family:inherit;font-size:13px;color:var(--ink);background:var(--panel);
+  }
+  .emp-list{
+    list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;
+    max-height:380px;overflow-y:auto;padding-right:2px;
+  }
+  .search-box{
+    position:relative;margin:12px 0 10px;padding-top:12px;border-top:1px dashed var(--line);
+  }
+  .search-icon{
+    position:absolute;left:10px;top:calc(50% + 6px);transform:translateY(-50%);
+    font-size:13px;opacity:0.55;pointer-events:none;
+  }
+  .emp-search{
+    width:100%;box-sizing:border-box;padding:9px 10px 9px 32px;border:1px solid var(--line);
+    border-radius:8px;font-family:inherit;font-size:13px;
+  }
+  .emp-list li{
+    display:flex;flex-direction:column;gap:6px;
+    background:var(--bg);padding:8px 10px;border-radius:8px;font-size:13px;
+  }
+  .emp-view-top{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;}
+  .emp-summary-main{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;flex:1;}
+  .emp-view-name{font-weight:700;font-size:14px;white-space:nowrap;flex:none;}
+  .position-tag{
+    display:inline-block;font-size:10px;font-weight:700;color:var(--brass-dark);
+    background:rgba(201,150,44,0.14);padding:1px 7px;border-radius:999px;
+    vertical-align:middle;flex:none;
+  }
+  .emp-detail-btn{
+    border:1px solid var(--line) !important;background:var(--panel) !important;color:var(--ink-soft) !important;
+    cursor:pointer;font-size:11px !important;font-weight:700;padding:4px 8px !important;border-radius:6px;flex:none;
+  }
+  .emp-detail-btn:hover{border-color:var(--brass) !important;color:var(--brass-dark) !important;}
+  .emp-detail{
+    margin-top:8px;padding:9px 10px;border-top:1px solid var(--line);
+    background:rgba(255,255,255,0.62);border-radius:0 0 7px 7px;
+  }
+  .emp-detail-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;line-height:1.7;}
+  .emp-detail-label{color:var(--muted);font-weight:700;flex:none;}
+  .emp-detail-value{color:var(--ink-soft);font-family:'Space Grotesk','Noto Sans KR',sans-serif;text-align:right;}
+  .emp-detail-actions{display:flex;justify-content:flex-end;margin-top:6px;}
+  .edit-emp-btn{
+    border:none;background:transparent;cursor:pointer;font-size:17px;
+    padding:3px 7px;border-radius:6px;line-height:1;color:var(--ink-soft) !important;
+  }
+  .edit-emp-btn:hover{background:var(--line);color:var(--brass-dark) !important;}
+  .emp-field-label{
+    display:block;font-size:10px;color:var(--muted);font-weight:700;
+    margin:8px 0 3px;text-transform:uppercase;letter-spacing:0.03em;
+  }
+  .emp-row-bottom{display:flex;gap:6px;}
+  .name-edit-input{
+    width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--line);
+    border-radius:6px;font-weight:700;font-size:13px;font-family:inherit;
+  }
+  .dept-edit-select, .type-edit-select, .position-edit-select{
+    flex:0 0 auto;padding:6px 6px;border:1px solid var(--line);border-radius:6px;
+    font-size:11px;font-family:inherit;background:var(--panel);color:var(--ink);
+  }
+  .dob-edit-input, .hire-date-edit-input{
+    width:100%;box-sizing:border-box;padding:6px 8px;border:1.5px solid var(--brass);border-radius:6px;
+    font-family:'Space Grotesk';font-size:12px;font-weight:700;
+    background:rgba(201,150,44,0.08);color:var(--ink);
+  }
+  .dob-edit-input{letter-spacing:1px;}
+  .emp-row-actions{display:flex;gap:6px;align-items:center;}
+  .emp-list button{border:none;background:transparent;color:var(--out-clay);cursor:pointer;font-size:13px;}
+  .emp-list .cancel-edit-row{color:var(--muted);text-decoration:underline;}
+  .emp-list .save-row{
+    background:var(--brass);color:var(--ink);padding:6px 10px;border-radius:6px;
+    font-weight:700;font-size:11px;flex:0 0 auto;
+  }
+  .emp-list .rm-emp{flex:0 0 auto;}
+
+  .leave-input{
+    padding:5px 6px;border:1px solid var(--line);border-radius:6px;
+    font-family:'Space Grotesk';font-size:12px;
+  }
+  #leaveTable .used-leave-input{width:56px;}
+  .save-leave-row{
+    background:var(--brass);color:var(--ink);border:none;padding:5px 10px;
+    border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;
+  }
+  .reset-used-row{
+    background:transparent;color:var(--muted);border:1px solid var(--line);padding:5px 8px;
+    border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;
+  }
+  .quick-amount-btn{
+    background:var(--bg);color:var(--ink-soft);border:1px solid var(--line);padding:8px 4px;
+    border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;
+  }
+  .quick-amount-btn:hover{border-color:var(--brass);color:var(--brass-dark);}
+  .rm-log-row{
+    border:none;background:transparent;color:var(--muted);cursor:pointer;
+    font-size:13px;font-weight:700;padding:2px 6px;border-radius:6px;
+  }
+  .rm-log-row:hover{color:var(--out-clay);background:var(--out-clay-soft);}
+  .edit-log-row{
+    border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);cursor:pointer;
+    font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;
+  }
+  .edit-log-row:hover{border-color:var(--brass);color:var(--brass-dark);}
+  .edit-log-row:disabled{opacity:0.35;cursor:not-allowed;}
+  .edit-log-row:disabled:hover{border-color:var(--line);color:var(--ink-soft);}
+
+  .panel-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;}
+  .controls input, .controls select{
+    padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;
+  }
+  .controls button{
+    border:none;background:var(--brass);color:var(--ink);padding:8px 14px;border-radius:8px;
+    font-weight:700;cursor:pointer;font-family:inherit;
+  }
+  .controls button:disabled{background:var(--line);color:var(--muted);cursor:not-allowed;}
+
+  /* 월/일을 하나의 조회 컨트롤에서 선택 */
+  .period-picker-wrap{position:relative;flex:0 0 auto;}
+  .controls .period-picker-trigger{
+    min-width:172px;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    padding:8px 11px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    font-size:13px;white-space:nowrap;
+  }
+  .controls .period-picker-trigger:hover,.controls .period-picker-trigger[aria-expanded="true"]{
+    border-color:var(--brass);box-shadow:0 0 0 2px rgba(201,150,44,0.12);
+  }
+  .period-picker-icon{font-size:14px;line-height:1;}
+  .period-picker-popover{
+    position:absolute;left:0;top:calc(100% + 8px);z-index:45;width:300px;max-width:calc(100vw - 48px);
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;
+    box-shadow:0 14px 34px rgba(28,35,49,0.18);
+  }
+  .period-picker-caption{font-size:10px;font-weight:700;color:var(--muted);margin:0 0 5px;}
+  .period-picker-popover input[type="month"]{width:100%;box-sizing:border-box;margin-bottom:8px;}
+  .controls .period-month-all{
+    width:100%;background:rgba(201,150,44,0.14);color:var(--brass-dark);border:1px solid rgba(201,150,44,0.35);
+    padding:8px 10px;margin-bottom:11px;
+  }
+  .controls .period-month-all:hover{border-color:var(--brass);}
+  .period-weekdays,.period-day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .period-weekdays{margin-bottom:4px;}
+  .period-weekdays span{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:2px 0;}
+  .period-day-blank{height:32px;}
+  .controls .period-day-btn{
+    width:100%;height:32px;padding:0;border:1px solid transparent;border-radius:7px;
+    background:transparent;color:var(--ink);font-size:12px;font-weight:600;
+  }
+  .controls .period-day-btn:hover{background:var(--bg);border-color:var(--line);}
+  .controls .period-day-btn.today{border-color:var(--brass);}
+  .controls .period-day-btn.selected{background:var(--brass);color:var(--ink);border-color:var(--brass);}
+  @media (max-width:520px){
+    .period-picker-wrap{width:100%;}
+    .controls .period-picker-trigger{width:100%;}
+    .period-picker-popover{width:100%;max-width:none;}
+  }
+
+  .table-wrap{overflow-x:auto;max-height:480px;overflow-y:auto;}
+  thead th{position:sticky;top:0;background:var(--panel);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;}
+  td.num, th.num{font-family:'Space Grotesk';}
+
+  /* 연차 승인 표: 좁은 화면에서도 열이 과도하게 찌그러지지 않게 하고,
+     액션 버튼은 셀 안쪽 래퍼에 flex를 적용해 행 구분선 높이를 맞춘다. */
+  #leaveApprovalTable{min-width:780px;}
+  #leaveApprovalTable .leave-reason-cell{
+    white-space:normal;min-width:150px;max-width:240px;overflow-wrap:anywhere;
+  }
+  #leaveApprovalTable .leave-action-cell{white-space:nowrap;}
+  .leave-action-group{display:flex;align-items:center;gap:6px;min-height:34px;}
+  .leave-permission-note{font-size:11px;color:var(--muted);line-height:1.35;}
+
+  .danger-link{
+    display:block;margin:22px auto 0;border:none;background:transparent;
+    color:var(--out-clay);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;
+  }
+  .loading{text-align:center;padding:60px 0;color:var(--muted);}
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:12px 20px;border-radius:999px;
+    font-size:13px;font-weight:700;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,0.25);
+  }
+
+  /* 운영 웹앱 셸 */
+  .app-shell{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;align-items:start;margin-top:18px;}
+  .side-menu{position:sticky;top:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px;}
+  .side-menu-title{font-size:10px;font-weight:900;color:var(--muted);letter-spacing:.08em;padding:8px 10px 6px;text-transform:uppercase;}
+  .side-menu .tabs{display:flex;flex-direction:column;gap:5px;background:transparent;padding:0;border-radius:0;}
+  .side-menu .tab-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;color:var(--ink-soft);padding:12px 13px;border-radius:10px;font-size:14px;}
+  .side-menu .tab-btn:hover{background:var(--bg);color:var(--ink);}
+  .side-menu .tab-btn.active{background:var(--ink);color:#fff;}
+  .side-menu .tab-icon{width:22px;text-align:center;font-size:16px;}
+  main{margin-top:0;min-width:0;}
+
+  /* 대시보드 */
+  .dashboard-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:16px;padding:4px 2px;}
+  .dashboard-kicker{font-size:12px;color:var(--brass-dark);font-weight:900;margin-bottom:5px;}
+  .dashboard-title{font-size:27px;font-weight:900;letter-spacing:-.04em;margin:0;}
+  .dashboard-subtitle{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.55;}
+  .dashboard-user-box{min-width:230px;display:flex;flex-direction:column;gap:6px;}
+  .dashboard-user-caption{font-size:10px;color:var(--muted);font-weight:900;}
+  .dashboard-login-button{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px 12px;font-family:inherit;font-weight:900;color:var(--ink);cursor:pointer;text-align:left;}
+  .dashboard-login-button:hover{border-color:var(--brass);color:var(--brass-dark);}
+  .dashboard-user-session{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px;}
+  .dashboard-user-identity{min-width:0;}
+  .dashboard-user-name{font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dashboard-user-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+  .dashboard-logout-button{border:none;background:var(--bg);color:var(--ink-soft);padding:6px 8px;border-radius:7px;font-family:inherit;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap;}
+  .dashboard-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
+  .dashboard-stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;text-align:left;color:var(--ink);font-family:inherit;}
+  .dashboard-stat-button{width:100%;cursor:pointer;transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease;}
+  .dashboard-stat-button:hover{transform:translateY(-1px);border-color:var(--brass);box-shadow:0 7px 18px rgba(28,35,49,.07);}
+  .dashboard-stat-button.locked{cursor:pointer;opacity:.74;}
+  .dashboard-stat-button.locked:hover{transform:none;border-color:var(--line);box-shadow:none;}
+  .dashboard-stat-label{font-size:11px;color:var(--muted);font-weight:700;}
+  .dashboard-stat-value{font-family:'Space Grotesk','Noto Sans KR',sans-serif;font-size:25px;font-weight:700;margin-top:4px;}
+  .dashboard-stat-note{font-size:10px;color:var(--ink-soft);margin-top:2px;}
+  .dashboard-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px;align-items:start;}
+  .dashboard-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:18px;}
+  .dashboard-composer .composer-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;margin-bottom:8px;}
+  .dashboard-composer select,.dashboard-composer input,.dashboard-composer textarea,.dashboard-filter{
+    border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:inherit;font-size:13px;background:var(--panel);color:var(--ink);
+  }
+  .dashboard-composer textarea{width:100%;min-height:92px;resize:vertical;line-height:1.55;}
+  .dashboard-composer-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;}
+  .dashboard-composer-note{font-size:11px;color:var(--muted);line-height:1.45;}
+  .dashboard-submit{border:none;background:var(--brass);color:var(--ink);padding:10px 17px;border-radius:9px;font-family:inherit;font-weight:900;cursor:pointer;white-space:nowrap;}
+  .dashboard-feed-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 2px 8px;}
+  .dashboard-feed-head h3{margin:0;font-size:15px;}
+  .dashboard-filter{padding:7px 9px;font-size:12px;}
+  .dashboard-feed{display:flex;flex-direction:column;gap:10px;}
+  .community-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 3px 12px rgba(28,35,49,.035);}
+  .community-card.notice{border-left:4px solid var(--out-clay);}
+  .community-card.closing{border-left:4px solid var(--brass);}
+  .community-card.daily{border-left:4px solid var(--in-green);}
+  .community-card.handoff{border-left:4px solid var(--ink-soft);}
+  .community-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .community-category{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;background:var(--bg);font-size:10px;font-weight:900;color:var(--ink-soft);margin-bottom:7px;}
+  .community-title{font-size:16px;font-weight:900;line-height:1.35;}
+  .community-meta{text-align:right;font-size:10px;color:var(--muted);line-height:1.5;white-space:nowrap;}
+  .community-body{font-size:13px;line-height:1.7;color:var(--ink-soft);margin-top:11px;white-space:normal;word-break:break-word;}
+  .community-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:13px;padding-top:11px;border-top:1px solid var(--line);}
+  .community-action{border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);padding:6px 9px;border-radius:8px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;}
+  .community-action.active{border-color:var(--brass);background:rgba(201,150,44,.12);color:var(--brass-dark);}
+  .community-action.confirm.active{border-color:var(--in-green);background:var(--in-green-soft);color:var(--in-green);}
+  .community-reaction-summary{font-size:10px;color:var(--muted);margin-top:7px;line-height:1.5;}
+  .community-comments{margin-top:11px;background:var(--bg);border-radius:10px;padding:9px;display:flex;flex-direction:column;gap:6px;}
+  .community-comment{font-size:12px;line-height:1.5;color:var(--ink-soft);}
+  .community-comment b{color:var(--ink);}
+  .community-comment-time{font-size:9px;color:var(--muted);margin-left:5px;}
+  .content-owner-actions{display:flex;gap:5px;margin-left:auto;}
+  .content-owner-action{border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);padding:6px 9px;border-radius:8px;font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;}
+  .content-owner-action:hover{border-color:var(--brass);color:var(--brass-dark);}
+  .content-owner-action.delete:hover{border-color:var(--out-clay);color:var(--out-clay);background:var(--out-clay-soft);}
+  .edited-label{font-size:9px;color:var(--muted);margin-left:5px;}
+  .comment-compose{display:flex;gap:6px;margin-top:3px;}
+  .comment-input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-family:inherit;font-size:12px;background:var(--panel);}
+  .comment-submit{border:none;background:var(--ink);color:#fff;border-radius:8px;padding:0 11px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;}
+  .dashboard-overview-list{display:flex;flex-direction:column;gap:9px;}
+  .dashboard-overview-item{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .dashboard-overview-item:last-child{border-bottom:none;padding-bottom:0;}
+  .dashboard-overview-item span:last-child{font-weight:900;}
+  button.dashboard-overview-item{width:100%;background:transparent;border-left:none;border-right:none;border-top:none;font-family:inherit;color:var(--ink);cursor:pointer;text-align:left;}
+  button.dashboard-overview-item:hover{color:var(--brass-dark);}
+  .working-now-list{display:flex;flex-direction:column;gap:12px;text-align:left;max-height:430px;overflow-y:auto;margin-top:14px;}
+  .working-dept{border:1px solid var(--line);border-radius:10px;padding:10px 11px;}
+  .working-dept-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:900;color:var(--ink-soft);padding-bottom:7px;border-bottom:1px solid var(--line);}
+  .working-people{display:flex;flex-direction:column;gap:7px;padding-top:8px;}
+  .working-person{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;}
+  .working-person-name{font-weight:800;}
+  .working-person-time{font-family:'Space Grotesk','Noto Sans KR',sans-serif;font-size:11px;color:var(--in-green);font-weight:700;white-space:nowrap;}
+  .quick-nav{display:flex;flex-direction:column;gap:7px;}
+  .quick-nav button{border:1px solid var(--line);background:var(--panel);padding:10px 11px;border-radius:9px;text-align:left;font-family:inherit;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+  .quick-nav button:hover{border-color:var(--brass);color:var(--brass-dark);}
+  .closing-page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px;}
+  .closing-page-head h1{margin:0;font-size:24px;}
+  .closing-page-head p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6;}
+  .closing-login-note{border:1px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--muted);background:var(--panel);}
+  .closing-login-note button{margin-top:10px;border:none;background:var(--brass);color:var(--ink);padding:9px 14px;border-radius:8px;font-family:inherit;font-weight:900;cursor:pointer;}
+  .closing-composer{margin-bottom:14px;}
+  .closing-composer-grid{display:grid;grid-template-columns:170px minmax(0,1fr);gap:8px;margin-bottom:8px;}
+  .closing-composer input,.closing-composer select,.closing-composer textarea{border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:inherit;font-size:13px;background:var(--panel);color:var(--ink);}
+  .closing-composer textarea{width:100%;box-sizing:border-box;min-height:260px;resize:vertical;line-height:1.65;}
+  .closing-photo-field{margin-top:9px;border:1px dashed var(--line);border-radius:10px;padding:10px 11px;background:var(--bg);}
+  .closing-photo-label{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:6px;}
+  .closing-photo-field input[type=file]{width:100%;box-sizing:border-box;padding:7px;background:var(--panel);font-size:12px;}
+  .closing-photo-preview{position:relative;display:inline-block;margin-top:9px;}
+  .closing-photo-preview img{display:block;max-width:220px;max-height:180px;object-fit:cover;border:1px solid var(--line);border-radius:9px;cursor:pointer;}
+  .closing-photo-remove{position:absolute;right:-8px;top:-8px;width:24px;height:24px;border:none;border-radius:50%;background:var(--out-clay);color:#fff;font-weight:900;cursor:pointer;}
+  .closing-list{display:flex;flex-direction:column;gap:10px;}
+  .closing-card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--brass);border-radius:14px;padding:16px;}
+  .closing-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .closing-card-title{font-size:16px;font-weight:900;line-height:1.4;}
+  .closing-card-meta{text-align:right;font-size:10px;color:var(--muted);line-height:1.5;white-space:nowrap;}
+  .closing-team-badge{display:inline-flex;padding:3px 8px;border-radius:999px;background:rgba(201,150,44,.14);color:var(--brass-dark);font-size:10px;font-weight:900;margin-bottom:7px;}
+  .closing-card-body{font-size:13px;line-height:1.75;color:var(--ink-soft);margin-top:11px;white-space:normal;word-break:break-word;}
+  .closing-report-photo{display:block;width:min(100%,520px);max-height:460px;object-fit:cover;border:1px solid var(--line);border-radius:10px;margin-top:12px;cursor:pointer;background:var(--bg);}
+  .closing-card-actions{display:flex;justify-content:flex-end;gap:5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);}
+  .closing-owner-reactions{margin-top:12px;}
+  .edit-form{display:flex;flex-direction:column;gap:8px;text-align:left;margin-top:14px;}
+  .edit-form label{font-size:11px;color:var(--muted);font-weight:800;}
+  .edit-form input,.edit-form select,.edit-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-family:inherit;font-size:13px;background:var(--panel);color:var(--ink);}
+  .edit-form textarea{min-height:130px;resize:vertical;line-height:1.6;}
+  .edit-row.hidden{display:none!important;}
+
+  @media (max-width:900px){
+    .app-shell{grid-template-columns:1fr;}
+    .side-menu{position:static;}
+    .side-menu-title{display:none;}
+    .side-menu .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+    .side-menu .tab-btn{justify-content:center;text-align:center;padding:10px 6px;font-size:12px;gap:5px;}
+    .dashboard-layout{grid-template-columns:1fr;}
+    .dashboard-side{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (max-width:620px){
+    .app{padding:12px 12px 42px;}
+    .topbar{padding:14px;}
+    .live-clock{font-size:20px;}
+    .side-menu .tabs{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .dashboard-hero{align-items:stretch;flex-direction:column;}
+    .dashboard-user-box{min-width:0;}
+    .dashboard-stats{grid-template-columns:1fr;}
+    .dashboard-composer .composer-row{grid-template-columns:1fr;}
+    .closing-page-head{flex-direction:column;}
+    .closing-composer-grid{grid-template-columns:1fr;}
+    .closing-card-head{flex-direction:column;}
+    .closing-card-meta{text-align:left;white-space:normal;}
+    .dashboard-side{grid-template-columns:1fr;}
+    .community-head{flex-direction:column;}
+    .community-meta{text-align:left;white-space:normal;}
+  }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">☕</div>
+      <div>
+        <div class="brand-title">매장 운영</div>
+        <div class="brand-sub" id="todayLabel">–</div>
+      </div>
+    </div>
+    <div class="live-clock num" id="liveClock">--:--:--</div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="side-menu">
+      <div class="side-menu-title">Menu</div>
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="dashboard"><span class="tab-icon">▦</span><span>대시보드</span></button>
+        <button class="tab-btn" data-tab="kiosk"><span class="tab-icon">⏱</span><span>키오스크</span></button>
+        <button class="tab-btn" data-tab="closing"><span class="tab-icon">☾</span><span>마감보고</span></button>
+        <button class="tab-btn" data-tab="admin"><span class="tab-icon">⚙</span><span>관리자</span><span id="adminTabBadge" class="hidden" style="background:var(--out-clay);color:#fff;border-radius:999px;padding:1px 6px;font-size:10px;margin-left:auto;">0</span></button>
+      </nav>
+    </aside>
+
+    <main>
+      <div id="loadingMsg" class="loading">불러오는 중…</div>
+
+      <section id="dashboardView" class="view hidden">
+        <div class="dashboard-hero">
+          <div>
+            <div class="dashboard-kicker">STORE COMMUNITY</div>
+            <h1 class="dashboard-title">오늘의 매장 대시보드</h1>
+            <div class="dashboard-subtitle">Team Talk, 공지사항과 인수인계를 한곳에서 확인해요.</div>
+          </div>
+          <div class="dashboard-user-box">
+            <div class="dashboard-user-caption">현재 사용자</div>
+            <button id="dashboardLoginOpenBtn" class="dashboard-login-button" type="button">🔐 직원 로그인</button>
+            <div id="dashboardUserSession" class="dashboard-user-session hidden">
+              <div class="dashboard-user-identity">
+                <div id="dashboardUserName" class="dashboard-user-name">-</div>
+                <div id="dashboardUserMeta" class="dashboard-user-meta">-</div>
+              </div>
+              <button id="dashboardLogoutBtn" class="dashboard-logout-button" type="button">로그아웃</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="dashboardStats" class="dashboard-stats"></div>
+
+        <div class="dashboard-layout">
+          <div class="dashboard-main">
+            <div class="panel dashboard-composer">
+              <h3>새 글 올리기</h3>
+              <div class="composer-row">
+                <select id="dashboardPostType" aria-label="게시물 종류">
+                  <option value="daily">Team Talk</option>
+                  <option value="notice">공지사항</option>
+                  <option value="handoff">인수인계</option>
+                </select>
+                <input id="dashboardPostTitle" maxlength="80" placeholder="제목 (선택)" />
+              </div>
+              <textarea id="dashboardPostBody" maxlength="2000" placeholder="Team Talk, 공지사항 또는 인수인계 내용을 입력해주세요."></textarea>
+              <div class="dashboard-composer-actions">
+                <div class="dashboard-composer-note">로그인한 사용자 이름으로 작성되며 모든 기기에 공유됩니다.</div>
+                <button id="dashboardPostSubmit" class="dashboard-submit" type="button">게시하기</button>
+              </div>
+            </div>
+
+            <div class="dashboard-feed-head">
+              <h3>커뮤니티 피드</h3>
+              <select id="dashboardFeedFilter" class="dashboard-filter" aria-label="게시물 필터">
+                <option value="">전체 글</option>
+                <option value="daily">Team Talk</option>
+                <option value="notice">공지사항</option>
+                <option value="handoff">인수인계</option>
+              </select>
+            </div>
+            <div id="dashboardFeed" class="dashboard-feed"></div>
+          </div>
+
+          <aside class="dashboard-side">
+            <div class="panel">
+              <h3>오늘 한눈에 보기</h3>
+              <div id="dashboardOverview" class="dashboard-overview-list"></div>
+            </div>
+            <div class="panel">
+              <h3>빠른 메뉴</h3>
+              <div class="quick-nav">
+                <button type="button" data-go-tab="kiosk">⏱ 출퇴근 키오스크 열기</button>
+                <button type="button" data-go-tab="closing">☾ 마감보고 작성 화면</button>
+                <button type="button" data-go-tab="admin">⚙ 관리자 화면</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="kioskView" class="view hidden">
+      <div id="kioskEmpty" class="empty hidden">
+        아직 등록된 직원이 없어요.
+        <br/>
+        <button id="goAdminBtn">관리자 화면에서 직원 추가하기</button>
+      </div>
+      <div id="employeeGrid"></div>
+    </section>
+
+    <section id="closingView" class="view hidden">
+      <div class="closing-page-head">
+        <div>
+          <div class="dashboard-kicker">PRIVATE TEAM LOG</div>
+          <h1>마감보고</h1>
+          <p>보고는 누적 저장되며 작성자의 같은 팀 직원과 대표님만 확인할 수 있어요.</p>
+        </div>
+        <div id="closingCurrentUser" class="dashboard-user-box"></div>
+      </div>
+
+      <div id="closingLoginGate" class="closing-login-note hidden">
+        마감보고를 작성하거나 확인하려면 직원 로그인이 필요해요.<br/>
+        <button id="closingLoginBtn" type="button">🔐 직원 로그인</button>
+      </div>
+
+      <div id="closingContent" class="hidden">
+        <div id="closingComposerPanel" class="panel closing-composer">
+          <h3>마감보고 작성</h3>
+          <div class="closing-composer-grid">
+            <select id="closingReportDept" class="hidden" aria-label="공유 팀"></select>
+            <input id="closingReportDate" type="date" aria-label="마감보고 날짜" />
+            <input id="closingReportTitle" maxlength="80" placeholder="제목 입력 (선택)" />
+          </div>
+          <textarea id="closingReportBody" maxlength="4000" placeholder="오늘의 마감 내용과 전달사항을 입력해주세요."></textarea>
+          <div class="closing-photo-field">
+            <label class="closing-photo-label" for="closingReportPhoto">본문 사진 (선택 · 내용 아래 표시 · 자동 압축)</label>
+            <input id="closingReportPhoto" type="file" accept="image/*" />
+            <div id="closingReportPhotoPreview" class="closing-photo-preview hidden">
+              <img id="closingReportPhotoPreviewImg" alt="마감보고 본문 사진 미리보기" />
+              <button id="closingReportPhotoRemove" class="closing-photo-remove" type="button" aria-label="본문 사진 제거">×</button>
+            </div>
+          </div>
+          <div class="dashboard-composer-actions">
+            <div id="closingComposerNote" class="dashboard-composer-note"></div>
+            <button id="closingReportSubmit" class="dashboard-submit" type="button">보고 올리기</button>
+          </div>
+        </div>
+        <div class="dashboard-feed-head">
+          <h3 id="closingListTitle">누적 마감보고</h3>
+        </div>
+        <div id="closingReportList" class="closing-list"></div>
+      </div>
+    </section>
+
+    <section id="adminView" class="view hidden">
+      <div class="admin-grid">
+        <div class="panel">
+          <h3>직원 관리</h3>
+          <div id="addEmpForm" class="inline-form">
+            <input id="newEmpName" placeholder="이름 입력" />
+            <select id="newEmpDept"></select>
+            <select id="newEmpType"></select>
+            <select id="newEmpPosition"></select>
+            <input id="newEmpDob" type="tel" inputmode="numeric" maxlength="6" placeholder="생년월일 6자리" />
+            <label class="inline-date-field"><span>입사일</span><input id="newEmpHireDate" type="date" /></label>
+            <button id="addEmpBtn" type="button">추가</button>
+          </div>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input id="empSearch" class="emp-search" placeholder="이름 / 직위 / 부서 검색" />
+          </div>
+          <ul id="empList" class="emp-list"></ul>
+        </div>
+        <div class="panel wide">
+          <div class="panel-header">
+            <h3>출퇴근 기록</h3>
+            <div class="controls">
+              <div class="period-picker-wrap" id="periodPickerWrap">
+                <button id="periodPickerBtn" class="period-picker-trigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="periodPickerLabel">조회 기간</span><span class="period-picker-icon">▣</span>
+                </button>
+                <div id="periodPickerPopover" class="period-picker-popover hidden" role="dialog" aria-label="출퇴근 기록 조회 기간 선택">
+                  <div class="period-picker-caption">월 선택</div>
+                  <input type="month" id="monthPicker" title="조회할 월 선택" aria-label="조회 월" />
+                  <input type="hidden" id="dayPicker" />
+                  <button id="periodMonthAllBtn" class="period-month-all" type="button">이 달 전체 보기</button>
+                  <div class="period-picker-caption">특정 날짜 선택</div>
+                  <div class="period-weekdays" aria-hidden="true">
+                    <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+                  </div>
+                  <div id="periodDayGrid" class="period-day-grid"></div>
+                </div>
+              </div>
+              <select id="deptFilter"><option value="">전체 부서</option></select>
+              <select id="empFilter"><option value="">전체 직원</option></select>
+              <button id="exportCsvBtn" type="button">CSV 다운로드</button>
+              <button id="exportXlsxBtn" type="button">출근기록부 다운로드(.xlsx)</button>
+              <button id="openLogAddBtn" type="button">기록 추가</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="logTable">
+              <thead><tr><th>날짜</th><th>부서</th><th>이름</th><th class="num">출근</th><th class="num">퇴근</th><th class="num">휴게</th><th class="num">근무시간</th><th></th></tr></thead>
+              <tbody id="logTbody"></tbody>
+            </table>
+          </div>
+          <div id="tableEmpty" class="empty hidden">해당 조건의 기록이 없어요.</div>
+        </div>
+      </div>
+      <div id="leaveApprovalPanel" class="panel" style="margin-top:16px;scroll-margin-top:18px;">
+        <h3>연차 신청 승인 <span id="pendingCountTag" class="hidden" style="background:var(--out-clay);color:#fff;border-radius:999px;padding:2px 9px;font-size:11px;margin-left:6px;">0</span></h3>
+        <div class="table-wrap">
+          <table id="leaveApprovalTable">
+            <thead><tr>
+              <th>이름</th><th>부서</th><th>기간</th><th class="num">일수</th><th>사유</th><th>상태</th><th></th>
+            </tr></thead>
+            <tbody id="leaveApprovalTbody"></tbody>
+          </table>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">대표님 또는 대표님에게 연월차 승인 권한을 받은 같은 팀 직원만 승인·거절할 수 있어요. 승인하면 자동으로 연차 사용 내역에 반영되고, 거절하면 반영 없이 기록만 남아요.</div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-header" style="margin-bottom:10px;">
+          <h3 style="margin:0;">연차 · 월차 관리</h3>
+          <div class="controls">
+            <select id="leaveDeptFilter"><option value="">전체 부서</option></select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="leaveTable">
+            <thead><tr>
+              <th>이름</th><th>부서</th><th>입사일</th><th>근속</th><th>구분</th>
+              <th class="num">발생</th><th class="num">사용</th><th class="num">잔여</th><th></th>
+            </tr></thead>
+            <tbody id="leaveTbody"></tbody>
+          </table>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;">
+          <b>정규직</b>: 첫 해엔 만근 기준 월 1일씩(최대 11일) 월차가 쌓이고, 만 1년이 지나면 그 월차와 별도로 연차 15일이 새로 생겨요(3년차부터 2년마다 1일 가산, 최대 25일). 1년~3년차 사이엔 26일로 고정 표시돼요.<br/>
+          <b>계약직 · 파트타이머</b>(주 15시간 이상 근무): 입사일 기준 매달 1일씩 상한 없이 쌓여요.<br/>
+          만근 여부는 앱이 자동으로 판단할 수 없어서(스케줄 정보가 없음), "내역" 버튼 → 구분을 "조정(가감)"으로 선택해서 관리자가 직접 -1일처럼 사유와 함께 차감할 수 있어요. "사용"은 실제 휴가 사용 차감용이에요. 연월차 승인 권한이 있는 관리자는 같은 부서 직원의 기록에 한해 "연차기록삭제" 버튼으로 연차 기록을 지울 수 있어요. 대표님은 전체 직원 기록을 관리할 수 있어요.
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <h3>관리자 접속 기록</h3>
+        <ul id="adminLogList" class="emp-list" style="max-height:180px;"></ul>
+      </div>
+    </section>
+    </main>
+  </div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-name" id="modalEmpName"></div>
+
+    <div id="verifyStep">
+      <div class="verify-label">본인 확인을 위해<br/>생년월일 6자리를 입력해주세요<br/>(예: 990101)</div>
+      <input id="dobInput" class="dob-field num" type="tel" inputmode="numeric" maxlength="6" placeholder="YYMMDD" />
+      <button id="dobConfirmBtn" class="punch-btn in" type="button" style="margin-top:10px;width:100%;">확인</button>
+    </div>
+    <div id="verifyBlocked" class="verify-blocked hidden">
+      생년월일이 아직 등록되지 않았어요.<br/>관리자 탭에서 먼저 설정해주세요.
+    </div>
+
+    <div id="punchStep" class="hidden">
+      <div class="modal-time num" id="modalTime">--:--</div>
+      <div class="modal-actions">
+        <button id="clockInBtn" class="punch-btn in" type="button">출근</button>
+        <button id="clockOutBtn" class="punch-btn out" type="button">퇴근</button>
+      </div>
+      <button id="openLeaveApplyBtn" type="button" class="leave-apply-link">연차 신청</button>
+    </div>
+
+    <button id="modalClose" class="modal-close" type="button">닫기</button>
+    <div id="stampFx" class="stamp-fx hidden"></div>
+  </div>
+</div>
+
+<div id="addEmpOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-name">직원 추가</div>
+    <div id="quickAddForm" class="inline-form" style="margin-top:16px;">
+      <input id="quickAddInput" placeholder="이름 입력" />
+      <select id="quickAddDept"></select>
+      <select id="quickAddType"></select>
+      <select id="quickAddPosition"></select>
+      <input id="quickAddDob" type="tel" inputmode="numeric" maxlength="6" placeholder="생년월일 6자리" />
+      <label class="inline-date-field"><span>입사일</span><input id="quickAddHireDate" type="date" /></label>
+      <button id="quickAddBtn" type="button">추가</button>
+    </div>
+    <button id="quickAddClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="confirmOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-name" id="confirmMsg" style="font-size:15px;font-weight:700;"></div>
+    <div class="modal-actions" style="margin-top:18px;">
+      <button id="confirmYesBtn" class="punch-btn out" type="button">확인</button>
+      <button id="confirmNoBtn" class="punch-btn" type="button" style="background:var(--muted);">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="dashboardLoginOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-name">직원 로그인</div>
+    <div class="verify-label">등록된 생년월일 6자리를 입력해주세요.<br/>대표님은 대표 비밀번호로 로그인해요.</div>
+    <input id="dashboardLoginPassword" class="dob-field num" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="비밀번호 6자리" />
+    <button id="dashboardLoginSubmit" class="punch-btn in" type="button" style="margin-top:10px;width:100%;">로그인</button>
+    <button id="dashboardLoginClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="workingNowOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-name">현재 근무 중</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:5px;">오늘 출근 후 아직 퇴근하지 않은 직원이에요.</div>
+    <div id="workingNowList" class="working-now-list"></div>
+    <button id="workingNowClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="contentEditOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-name" id="contentEditTitleLabel">글 수정</div>
+    <div class="edit-form">
+      <div id="contentEditTypeRow" class="edit-row">
+        <label for="contentEditType">글 종류</label>
+        <select id="contentEditType">
+          <option value="daily">Team Talk</option>
+          <option value="notice">공지사항</option>
+          <option value="handoff">인수인계</option>
+        </select>
+      </div>
+      <div id="contentEditDeptRow" class="edit-row hidden">
+        <label for="contentEditDept">공유 팀</label>
+        <select id="contentEditDept"></select>
+      </div>
+      <div id="contentEditDateRow" class="edit-row hidden">
+        <label for="contentEditDate">마감보고 날짜</label>
+        <input id="contentEditDate" type="date" />
+      </div>
+      <label for="contentEditTitle">제목</label>
+      <input id="contentEditTitle" maxlength="80" placeholder="제목 입력" />
+      <label for="contentEditBody">내용</label>
+      <textarea id="contentEditBody" maxlength="4000"></textarea>
+      <div id="contentEditPhotoRow" class="edit-row hidden">
+        <label for="contentEditPhoto">본문 사진</label>
+        <input id="contentEditPhoto" type="file" accept="image/*" />
+        <div id="contentEditPhotoPreview" class="closing-photo-preview hidden">
+          <img id="contentEditPhotoPreviewImg" alt="본문 사진 미리보기" />
+          <button id="contentEditPhotoRemove" class="closing-photo-remove" type="button" aria-label="본문 사진 제거">×</button>
+        </div>
+      </div>
+    </div>
+    <button id="contentEditSave" class="punch-btn in" type="button" style="margin-top:12px;width:100%;">저장</button>
+    <button id="contentEditClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="adminLoginOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-name">관리자 확인</div>
+    <div class="verify-label">관리자 비밀번호를 입력해주세요.<br/>대표님은 지정 비밀번호, 권한을 부여받은 직원은 등록된 생년월일 6자리로 접속해요.</div>
+    <input id="adminDobInput" class="dob-field num" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="비밀번호 6자리" />
+    <button id="adminLoginBtn" class="punch-btn in" type="button" style="margin-top:10px;width:100%;">확인</button>
+    <button id="adminLoginClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="leaveDetailOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-name" id="leaveDetailName"></div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 14px;">현재 주기(입사 기념일 기준) 기준으로 계산돼요. 지난 주기 기록은 흐리게 표시돼요.</div>
+    <div id="leaveDetailList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;text-align:left;"></div>
+    <div style="border-top:1px solid var(--line);margin:14px 0;"></div>
+    <div style="text-align:left;">
+      <select id="leaveEntryKind" class="leave-input" style="width:100%;margin-bottom:6px;">
+        <option value="use">사용</option>
+        <option value="adjust">조정(가감)</option>
+      </select>
+
+      <div id="leaveDateRangeRow" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <input type="date" id="leaveEntryStartDate" class="leave-input" style="flex:1;">
+        <span style="color:var(--muted);font-size:12px;">~</span>
+        <input type="date" id="leaveEntryEndDate" class="leave-input" style="flex:1;">
+      </div>
+      <div id="leaveSingleDateRow" class="hidden" style="margin-bottom:6px;">
+        <input type="date" id="leaveEntryAdjustDate" class="leave-input" style="width:100%;">
+      </div>
+
+      <div id="leaveRangeAmountLabel" class="hidden" style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">
+        차감 일수: <span class="num" id="leaveRangeAmountValue" style="font-weight:700;">-</span>일
+      </div>
+      <div id="quickAmountRow" style="display:flex;gap:6px;margin-bottom:6px;">
+        <button type="button" class="quick-amount-btn" data-val="1" style="flex:1;">1일</button>
+        <button type="button" class="quick-amount-btn" data-val="0.5" style="flex:1;">반차(0.5)</button>
+        <button type="button" class="quick-amount-btn" data-val="0.25" style="flex:1;">반반차(0.25)</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input type="number" id="leaveEntryAmount" class="leave-input" step="0.25" min="0" placeholder="직접 입력 (예: 0.5)" style="flex:1;">
+        <input type="number" id="leaveEntryAdjustAmount" class="leave-input hidden" step="0.5" placeholder="예: -1" style="flex:1;">
+      </div>
+
+      <textarea id="leaveEntryReason" placeholder="사유 입력 (예: 개인 사정 / 6월 결근 3회로 만근 미달)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;min-height:56px;resize:vertical;"></textarea>
+
+      <div style="margin-top:8px;">
+        <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">진료확인서 등 사진 첨부 (선택)</label>
+        <input type="file" id="leaveEntryPhoto" accept="image/*" style="width:100%;font-size:12px;">
+        <div id="leaveEntryPhotoPreview" class="hidden" style="margin-top:6px;position:relative;display:inline-block;">
+          <img id="leaveEntryPhotoPreviewImg" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--line);display:block;">
+          <button id="leaveEntryPhotoRemove" type="button" style="position:absolute;top:-8px;right:-8px;background:var(--out-clay);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;">✕</button>
+        </div>
+      </div>
+
+      <button id="leaveEntryAddBtn" type="button" class="punch-btn in" style="margin-top:10px;width:100%;">추가</button>
+    </div>
+    <button id="leaveDetailClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="photoViewOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:520px;padding:18px;">
+    <img id="photoViewImg" style="width:100%;border-radius:8px;display:block;">
+    <button id="photoViewClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="logEditOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:340px;">
+    <div class="modal-name" id="logEditTitle"></div>
+    <div style="text-align:left;margin-top:14px;">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">출근 시간</label>
+      <input type="time" id="logEditInTime" class="leave-input" style="width:100%;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">퇴근 시간</label>
+      <input type="time" id="logEditOutTime" class="leave-input" style="width:100%;">
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">비워두면 그 항목은 기록에서 지워져요. 휴게시간은 저장하면 자동으로 다시 계산돼요.</div>
+    </div>
+    <button id="logEditSaveBtn" class="punch-btn in" type="button" style="margin-top:14px;width:100%;">저장</button>
+    <button id="logEditClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="logAddOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:340px;">
+    <div class="modal-name">기록 추가 (과거 날짜 가능)</div>
+    <div style="text-align:left;margin-top:14px;">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">직원</label>
+      <input type="text" id="logAddEmpInput" class="leave-input" list="logAddEmpList" placeholder="직원 이름 검색" autocomplete="off" style="width:100%;margin-bottom:10px;box-sizing:border-box;">
+      <datalist id="logAddEmpList"></datalist>
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">날짜</label>
+      <input type="date" id="logAddDate" class="leave-input" style="width:100%;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">출근 시간</label>
+      <input type="time" id="logAddInTime" class="leave-input" style="width:100%;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">퇴근 시간</label>
+      <input type="time" id="logAddOutTime" class="leave-input" style="width:100%;">
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">해당 날짜에 이미 기록이 있으면 여기서 입력한 값으로 덮어써요. 하나만 입력해도 저장돼요.</div>
+    </div>
+    <button id="logAddSaveBtn" class="punch-btn in" type="button" style="margin-top:14px;width:100%;">추가</button>
+    <button id="logAddClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="leaveApplyOverlay" class="modal-overlay hidden">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-name" id="leaveApplyName"></div>
+    <div style="text-align:left;margin-top:14px;">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <input type="date" id="leaveApplyStart" class="leave-input" style="flex:1;">
+        <span style="color:var(--muted);font-size:12px;">~</span>
+        <input type="date" id="leaveApplyEnd" class="leave-input" style="flex:1;">
+      </div>
+      <div id="leaveApplyKindRow" style="display:flex;gap:6px;margin-bottom:6px;">
+        <button type="button" class="quick-amount-btn leave-apply-kind-btn" data-val="1" style="flex:1;">연차(1일)</button>
+        <button type="button" class="quick-amount-btn leave-apply-kind-btn" data-val="0.5" style="flex:1;">반차</button>
+        <button type="button" class="quick-amount-btn leave-apply-kind-btn" data-val="0.25" style="flex:1;">반반차</button>
+      </div>
+      <div id="leaveApplyRangeNote" class="hidden" style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">여러 날짜 신청은 자동으로 하루씩 연차 처리돼요.</div>
+      <textarea id="leaveApplyReason" placeholder="사유 입력" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;min-height:56px;resize:vertical;"></textarea>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">신청하면 대표님 또는 연월차 승인 권한을 받은 같은 팀 직원의 승인 후에 반영돼요. 승인 전까지는 "승인대기" 상태로 표시돼요.</div>
+    </div>
+    <button id="leaveApplySubmitBtn" class="punch-btn in" type="button" style="margin-top:12px;width:100%;">신청</button>
+    <button id="leaveApplyClose" class="modal-close" type="button">닫기</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+let employees = []; // [{name, dept}]
+let log = [];
+let currentEmp = null;
+let adminLogins = [];
+let adminUnlocked = false;
+let currentAdminName = null;
+let leaveRequests = [];
+let leaveApplications = [];
+let leaveDetailTargetName = null;
+let pendingLeavePhoto = null;
+let logEditTarget = null;
+let dashboardPosts = [];
+let closingReports = [];
+let pendingClosingPhoto = null;
+let pendingContentEditPhoto = null;
+let lastClosingComposerActor = '';
+let pendingDashboardLoginAction = '';
+let contentEditTarget = null;
+
+const DEPTS = ['BOH','FOH','베이커리','마케팅','기타'];
+const POSITIONS = ['매니저','수퍼바이저','사원'];
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBGwDt5RPy7zg39BWoqwwy5_4gcwGJon5U",
+  authDomain: "hapjeong-store.firebaseapp.com",
+  databaseURL: "https://hapjeong-store-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "hapjeong-store",
+  storageBucket: "hapjeong-store.firebasestorage.app",
+  messagingSenderId: "1055521674930",
+  appId: "1:1055521674930:web:84f0377abd3d1af7435bab"
+};
+let fbDb = null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  fbDb = firebase.database();
+}catch(err){ console.error('firebase init failed', err); }
+
+function pad(n){return String(n).padStart(2,'0');}
+function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function localDateKey(ts){ return dateKey(new Date(ts)); }
+function timeLabel(d){return pad(d.getHours())+':'+pad(d.getMinutes());}
+function monthKeyOf(dk){return dk.slice(0,7);}
+
+function formatMonthLabel(monthKey){
+  if(!/^\d{4}-\d{2}$/.test(monthKey||'')) return '조회 기간';
+  const [year, month] = monthKey.split('-');
+  return `${year}년 ${Number(month)}월`;
+}
+function formatDayLabel(dayKey){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dayKey||'')) return '';
+  const [year, month, day] = dayKey.split('-');
+  return `${year}. ${month}. ${day}.`;
+}
+function closePeriodPicker(){
+  const popover = document.getElementById('periodPickerPopover');
+  const btn = document.getElementById('periodPickerBtn');
+  if(!popover || !btn) return;
+  popover.classList.add('hidden');
+  btn.setAttribute('aria-expanded','false');
+}
+function renderPeriodPicker(){
+  const monthInput = document.getElementById('monthPicker');
+  const dayInput = document.getElementById('dayPicker');
+  const label = document.getElementById('periodPickerLabel');
+  const monthAllBtn = document.getElementById('periodMonthAllBtn');
+  const grid = document.getElementById('periodDayGrid');
+  if(!monthInput || !dayInput || !label || !monthAllBtn || !grid) return;
+
+  let monthKey = monthInput.value;
+  if(!/^\d{4}-\d{2}$/.test(monthKey||'')){
+    const now = new Date();
+    monthKey = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+    monthInput.value = monthKey;
+  }
+  const specificDate = dayInput.value;
+  label.textContent = specificDate ? formatDayLabel(specificDate) : formatMonthLabel(monthKey);
+  monthAllBtn.textContent = `${formatMonthLabel(monthKey)} 전체 보기`;
+
+  const [year, month] = monthKey.split('-').map(Number);
+  const firstWeekday = new Date(year, month-1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const today = dateKey(new Date());
+  let html = '';
+  for(let i=0;i<firstWeekday;i++) html += '<span class="period-day-blank"></span>';
+  for(let day=1;day<=daysInMonth;day++){
+    const dk = `${year}-${pad(month)}-${pad(day)}`;
+    const cls = ['period-day-btn'];
+    if(dk===today) cls.push('today');
+    if(dk===specificDate) cls.push('selected');
+    html += `<button type="button" class="${cls.join(' ')}" data-date="${dk}" aria-label="${year}년 ${month}월 ${day}일">${day}</button>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('.period-day-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      dayInput.value = btn.dataset.date;
+      monthInput.value = btn.dataset.date.slice(0,7);
+      renderPeriodPicker();
+      renderTable();
+      closePeriodPicker();
+    });
+  });
+}
+
+function empNames(){ return employees.map(e=>e.name); }
+function deptOf(name){
+  const found = employees.find(e=>e.name===name);
+  return found ? found.dept : '기타';
+}
+function deptOptionsHtml(selected){
+  return DEPTS.map(d=>`<option value="${d}" ${d===selected?'selected':''}>${d}</option>`).join('');
+}
+function empTypeOptionsHtml(selected){
+  const cur = selected || '정규직';
+  return ['정규직','계약직','파트타이머'].map(t=>`<option value="${t}" ${t===cur?'selected':''}>${t}</option>`).join('');
+}
+function positionOptionsHtml(selected){
+  const cur = selected || '사원';
+  return POSITIONS.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p}</option>`).join('');
+}
+
+function sortByDeptName(list){
+  return list.slice().sort((a,b)=>{
+    const da = DEPTS.indexOf(a.dept), db = DEPTS.indexOf(b.dept);
+    if(da !== db) return da - db;
+    return a.name.localeCompare(b.name, 'ko');
+  });
+}
+
+// Firebase가 있으면 실시간 공유 저장소로 쓰고, 안 되면(오프라인 등) 이 기기의 localStorage로 대체
+async function storeGet(key){
+  if(fbDb){
+    try{
+      const snap = await fbDb.ref(key).get();
+      return snap.exists() ? snap.val() : null;
+    }catch(err){ console.error('firebase get failed', err); }
+  }
+  try{ return localStorage.getItem(key); }
+  catch(err){ return null; }
+}
+async function storeSet(key, value){
+  if(fbDb){
+    try{ await fbDb.ref(key).set(value); }
+    catch(err){ console.error('firebase set failed', err); showToast('⚠ 동기화 실패 (이 기기엔 저장됨)'); }
+  }
+  try{ localStorage.setItem(key, value); }
+  catch(err){ console.error('localStorage save failed', err); }
+}
+
+async function loadAll(){
+  try{
+    const raw = JSON.parse((await storeGet('att-employees')) || '[]');
+    // normalize legacy flat string arrays into {name, dept} objects
+    employees = raw.map(item => typeof item === 'string' ? {name:item, dept:'기타'} : item);
+  }catch(err){ employees = []; }
+  try{
+    log = JSON.parse((await storeGet('att-log')) || '[]');
+  }catch(err){ log = []; }
+  try{
+    adminLogins = JSON.parse((await storeGet('admin-logins')) || '[]');
+  }catch(err){ adminLogins = []; }
+  try{
+    leaveRequests = JSON.parse((await storeGet('leave-requests')) || '[]');
+  }catch(err){ leaveRequests = []; }
+  try{
+    leaveApplications = JSON.parse((await storeGet('leave-applications')) || '[]');
+  }catch(err){ leaveApplications = []; }
+  try{
+    const rawPosts = JSON.parse((await storeGet('dashboard-posts')) || '[]');
+    dashboardPosts = Array.isArray(rawPosts) ? rawPosts.map(p=>({
+      ...p,
+      likes: Array.isArray(p.likes) ? p.likes : [],
+      confirms: Array.isArray(p.confirms) ? p.confirms : [],
+      comments: Array.isArray(p.comments) ? p.comments : []
+    })) : [];
+  }catch(err){ dashboardPosts = []; }
+  try{
+    const rawReports = JSON.parse((await storeGet('closing-reports')) || '[]');
+    closingReports = Array.isArray(rawReports) ? rawReports.map(normalizeClosingReport) : [];
+  }catch(err){ closingReports = []; }
+
+  // 이전 버전에서 커뮤니티에 작성한 마감보고는 전용 누적 목록으로 한 번 이동
+  const legacyClosings = dashboardPosts.filter(p=>p.type==='closing');
+  if(legacyClosings.length){
+    legacyClosings.forEach(p=>{
+      if(!closingReports.some(r=>String(r.id)===String(p.id))){
+        closingReports.push(normalizeClosingReport({
+          id:p.id, title:p.title||'', content:p.content||'', author:p.author||'',
+          authorDept:p.authorDept||deptOf(p.author||''), createdAt:p.createdAt||new Date().toISOString(),
+          updatedAt:p.updatedAt||'', reportDate:localDateKey(p.createdAt||new Date().toISOString()),
+          photo:p.photo||null, likes:[], comments:[]
+        }));
+      }
+    });
+    dashboardPosts = dashboardPosts.filter(p=>p.type!=='closing');
+    await storeSet('dashboard-posts', JSON.stringify(dashboardPosts));
+    await storeSet('closing-reports', JSON.stringify(closingReports));
+  }
+
+  // 예전 이름 보정 (필요 없다면 그대로 둬도 무해함)
+  const NAME_FIX = { '김보람':'유보람', '최한별':'유한별' };
+  let fixed = false;
+  employees.forEach(e=>{
+    if(NAME_FIX[e.name]){ e.name = NAME_FIX[e.name]; fixed = true; }
+  });
+  log.forEach(ev=>{
+    if(NAME_FIX[ev.name]){ ev.name = NAME_FIX[ev.name]; fixed = true; }
+  });
+
+  // 예전 부서명 보정 (주방→BOH, 프론트→FOH)
+  const DEPT_FIX = { '주방':'BOH', '프론트':'FOH' };
+  employees.forEach(e=>{
+    if(DEPT_FIX[e.dept]){ e.dept = DEPT_FIX[e.dept]; fixed = true; }
+  });
+
+  if(fixed){ await saveEmployees(); await saveLog(); }
+}
+
+async function saveEmployees(){
+  await storeSet('att-employees', JSON.stringify(employees));
+}
+async function saveLog(){
+  await storeSet('att-log', JSON.stringify(log));
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=>{ t.classList.add('hidden'); }, 2200);
+}
+
+function askConfirm(msg){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById('confirmOverlay');
+    document.getElementById('confirmMsg').textContent = msg;
+    overlay.classList.remove('hidden');
+    const yes = document.getElementById('confirmYesBtn');
+    const no = document.getElementById('confirmNoBtn');
+    function cleanup(result){
+      overlay.classList.add('hidden');
+      yes.removeEventListener('click', onYes);
+      no.removeEventListener('click', onNo);
+      resolve(result);
+    }
+    function onYes(){ cleanup(true); }
+    function onNo(){ cleanup(false); }
+    yes.addEventListener('click', onYes);
+    no.addEventListener('click', onNo);
+  });
+}
+
+function openAddEmpModal(){
+  document.getElementById('quickAddInput').value='';
+  document.getElementById('quickAddDob').value='';
+  document.getElementById('quickAddHireDate').value='';
+  document.getElementById('addEmpOverlay').classList.remove('hidden');
+  setTimeout(()=>{ document.getElementById('quickAddInput').focus(); }, 50);
+}
+function closeAddEmpModal(){
+  document.getElementById('addEmpOverlay').classList.add('hidden');
+}
+
+function renderClock(){
+  const now = new Date();
+  document.getElementById('liveClock').textContent =
+    pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  document.getElementById('todayLabel').textContent =
+    now.toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+}
+
+function todayEventsFor(name){
+  const dk = dateKey(new Date());
+  return log.filter(ev => ev.name===name && localDateKey(ev.ts)===dk);
+}
+
+
+const DASHBOARD_TYPES = {
+  daily:{label:'Team Talk', icon:'☕'},
+  notice:{label:'공지사항', icon:'📣'},
+  handoff:{label:'인수인계', icon:'↗'}
+};
+
+async function saveDashboardPosts(){
+  await storeSet('dashboard-posts', JSON.stringify(dashboardPosts));
+}
+async function saveClosingReports(){
+  await storeSet('closing-reports', JSON.stringify(closingReports));
+}
+
+const FOH_CLOSING_TEMPLATE = `✅마감 보고✅
+1. 직원 별 출퇴근 시간
+- 09:15 ~ 18:00 : 
+- 10:00 ~ 19:30 : 
+- 10:30 ~ 19:30 : 
+
+3. 컴플레인 이슈 
+- 
+
+5. 단체주문 유무 (Y/N):
+- 
+
+6. 발주 진행 (Y/N)
+- 
+
+7. 인수인계 사항
+- 
+- 
+-
+
+8. 퇴근 전 각 층 냉난방기, 전등 확인`;
+
+function normalizeClosingReport(report){
+  const source = report && typeof report==='object' ? report : {};
+  const createdAt = source.createdAt || new Date().toISOString();
+  return {
+    ...source,
+    title:String(source.title||'').trim(),
+    reportDate:source.reportDate || localDateKey(createdAt),
+    photo:source.photo || null,
+    likes:Array.isArray(source.likes) ? source.likes : [],
+    comments:Array.isArray(source.comments) ? source.comments : [],
+    createdAt
+  };
+}
+
+function closingDateLabel(dateStr){
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr||''));
+  return match ? `${match[1]}. ${match[2]}. ${match[3]}.` : String(dateStr||'');
+}
+
+function closingReportDisplayTitle(report){
+  const dateStr = report.reportDate || localDateKey(report.createdAt||new Date().toISOString());
+  const title = String(report.title||'').trim();
+  return title ? `${closingDateLabel(dateStr)} ${title}` : closingDateLabel(dateStr);
+}
+
+function resetClosingComposer(actor=dashboardActor()){
+  const dateEl = document.getElementById('closingReportDate');
+  const titleEl = document.getElementById('closingReportTitle');
+  const bodyEl = document.getElementById('closingReportBody');
+  if(dateEl) dateEl.value = dateKey(new Date());
+  if(titleEl) titleEl.value = '';
+  const dept = actor===OWNER_NAME ? '' : (dashboardActorEmployee(actor)?.dept||'기타');
+  if(bodyEl) bodyEl.value = dept==='FOH' ? FOH_CLOSING_TEMPLATE : '';
+  pendingClosingPhoto = null;
+  const photoInput = document.getElementById('closingReportPhoto');
+  const photoPreview = document.getElementById('closingReportPhotoPreview');
+  if(photoInput) photoInput.value = '';
+  if(photoPreview) photoPreview.classList.add('hidden');
+}
+
+function dashboardActor(){
+  const saved = (sessionStorage.getItem('dashboard-actor') || '').trim();
+  if(!saved) return '';
+  if(saved === OWNER_NAME) return saved;
+  if(employees.some(e=>e.name===saved)) return saved;
+  sessionStorage.removeItem('dashboard-actor');
+  return '';
+}
+
+function dashboardActorEmployee(name=dashboardActor()){
+  return employees.find(e=>e.name===name) || null;
+}
+
+function actorHasAnyAdminPermission(name=dashboardActor()){
+  if(name === OWNER_NAME) return true;
+  const emp = dashboardActorEmployee(name);
+  return !!(emp && (emp.canEditLog === true || emp.canApproveLeave === true));
+}
+
+function actorCanApproveLeave(name=dashboardActor()){
+  if(name === OWNER_NAME) return true;
+  const emp = dashboardActorEmployee(name);
+  return !!(emp && emp.canApproveLeave === true);
+}
+
+function renderDashboardUserState(){
+  const actor = dashboardActor();
+  const loginBtn = document.getElementById('dashboardLoginOpenBtn');
+  const sessionBox = document.getElementById('dashboardUserSession');
+  const nameEl = document.getElementById('dashboardUserName');
+  const metaEl = document.getElementById('dashboardUserMeta');
+  if(!loginBtn || !sessionBox || !nameEl || !metaEl) return;
+  if(!actor){
+    loginBtn.classList.remove('hidden');
+    sessionBox.classList.add('hidden');
+    return;
+  }
+  loginBtn.classList.add('hidden');
+  sessionBox.classList.remove('hidden');
+  nameEl.textContent = actor;
+  if(actor === OWNER_NAME){
+    metaEl.textContent = '전체 부서 · 대표';
+  }else{
+    const emp = dashboardActorEmployee(actor);
+    metaEl.textContent = `${emp?.dept||'기타'} · ${emp?.position||'사원'}`;
+  }
+}
+
+function openDashboardLogin(action=''){
+  pendingDashboardLoginAction = action;
+  const input = document.getElementById('dashboardLoginPassword');
+  input.value = '';
+  document.getElementById('dashboardLoginOverlay').classList.remove('hidden');
+  setTimeout(()=>input.focus(), 50);
+}
+
+function closeDashboardLogin(){
+  pendingDashboardLoginAction = '';
+  document.getElementById('dashboardLoginOverlay').classList.add('hidden');
+}
+
+async function attemptDashboardLogin(){
+  const password = document.getElementById('dashboardLoginPassword').value.trim();
+  if(!/^\d{6}$/.test(password)){ showToast('비밀번호 6자리를 입력해주세요.'); return; }
+
+  let name = '';
+  if(password === OWNER_PASSWORD){
+    name = OWNER_NAME;
+  }else{
+    const matches = employees.filter(e=>!!e.dob && e.dob===password);
+    if(matches.length===0){
+      showToast('등록된 직원 비밀번호가 아니에요.');
+      document.getElementById('dashboardLoginPassword').value='';
+      return;
+    }
+    if(matches.length>1){
+      showToast('같은 생년월일을 가진 직원이 둘 이상이라 로그인할 수 없어요. 대표님이 직원 정보를 확인해주세요.');
+      document.getElementById('dashboardLoginPassword').value='';
+      return;
+    }
+    name = matches[0].name;
+  }
+
+  const action = pendingDashboardLoginAction;
+  sessionStorage.setItem('dashboard-actor', name);
+  if(currentAdminName && currentAdminName!==name){
+    currentAdminName = null;
+    adminUnlocked = false;
+  }
+  document.getElementById('dashboardLoginOverlay').classList.add('hidden');
+  pendingDashboardLoginAction = '';
+  renderDashboard();
+  renderClosingReports();
+  showToast(name+' 님으로 로그인했어요.');
+  if(action==='leave-approval') await openPendingLeaveApprovals();
+  if(action==='closing') switchTab('closing');
+}
+
+function logoutDashboardActor(){
+  const actor = dashboardActor();
+  sessionStorage.removeItem('dashboard-actor');
+  if(currentAdminName===actor){
+    currentAdminName = null;
+    adminUnlocked = false;
+  }
+  renderDashboard();
+  renderClosingReports();
+  showToast('로그아웃했어요.');
+}
+
+function dashboardTimeLabel(ts){
+  const d = new Date(ts);
+  if(Number.isNaN(d.getTime())) return '';
+  const today = dateKey(new Date());
+  const day = dateKey(d);
+  if(day===today) return '오늘 '+timeLabel(d);
+  return d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function dashboardPostTitle(post){
+  if(post.title && post.title.trim()) return post.title.trim();
+  const meta = DASHBOARD_TYPES[post.type] || DASHBOARD_TYPES.daily;
+  return meta.label;
+}
+
+function dashboardNamesSummary(names){
+  if(!Array.isArray(names) || names.length===0) return '';
+  if(names.length<=3) return names.join(', ');
+  return names.slice(0,3).join(', ')+' 외 '+(names.length-3)+'명';
+}
+
+function currentWorkingEmployees(){
+  return employees.map(emp=>{
+    const events = todayEventsFor(emp.name).sort((a,b)=>a.ts.localeCompare(b.ts));
+    const last = events[events.length-1];
+    if(!last || last.type!=='in') return null;
+    const latestIn = events.slice().reverse().find(ev=>ev.type==='in');
+    return { emp, clockIn: latestIn ? timeLabel(new Date(latestIn.ts)) : '-' };
+  }).filter(Boolean);
+}
+
+function openWorkingNow(){
+  const list = document.getElementById('workingNowList');
+  const working = currentWorkingEmployees();
+  if(working.length===0){
+    list.innerHTML = '<div class="empty" style="padding:24px 12px;">현재 근무 중인 직원이 없어요.</div>';
+  }else{
+    const departmentOrder = [...DEPTS, ...Array.from(new Set(working.map(item=>item.emp.dept).filter(d=>!DEPTS.includes(d))))];
+    list.innerHTML = departmentOrder.map(dept=>{
+      const members = working.filter(item=>(item.emp.dept||'기타')===dept);
+      if(!members.length) return '';
+      return `<section class="working-dept">
+        <div class="working-dept-head"><span>${escapeHtml(dept)}</span><span>${members.length}명</span></div>
+        <div class="working-people">${members.map(item=>`<div class="working-person"><span class="working-person-name">${escapeHtml(item.emp.name)}</span><span class="working-person-time">출근 ${escapeHtml(item.clockIn)}</span></div>`).join('')}</div>
+      </section>`;
+    }).join('');
+  }
+  document.getElementById('workingNowOverlay').classList.remove('hidden');
+}
+
+function closeWorkingNow(){
+  document.getElementById('workingNowOverlay').classList.add('hidden');
+}
+
+async function openPendingLeaveApprovals(){
+  const actor = dashboardActor();
+  if(!actor){
+    openDashboardLogin('leave-approval');
+    return;
+  }
+  if(!actorCanApproveLeave(actor)){
+    showToast('연월차 승인 권한이 있는 직원과 대표님만 열 수 있어요.');
+    return;
+  }
+  if(!adminUnlocked || currentAdminName!==actor){
+    adminUnlocked = true;
+    currentAdminName = actor;
+    await logAdminAccess(actor);
+  }
+  switchTab('admin');
+  setTimeout(()=>document.getElementById('leaveApprovalPanel')?.scrollIntoView({behavior:'smooth',block:'start'}), 80);
+}
+
+function renderDashboardStats(){
+  const el = document.getElementById('dashboardStats');
+  const overview = document.getElementById('dashboardOverview');
+  if(!el || !overview) return;
+  const today = dateKey(new Date());
+  const todayPosts = dashboardPosts.filter(p=>localDateKey(p.createdAt)===today).length;
+  const clockedIn = currentWorkingEmployees().length;
+  const pending = leaveApplications.filter(a=>a.status==='pending').length;
+  const actor = dashboardActor();
+  const closingCount = visibleClosingReports(actor).filter(r=>localDateKey(r.createdAt)===today).length;
+  const canOpenLeave = actorCanApproveLeave(actor);
+  const pendingNote = !actor ? '로그인 후 권한에 따라 확인' : canOpenLeave ? '눌러서 승인 화면 열기' : '연월차 승인 권한이 필요해요';
+
+  el.innerHTML = `
+    <button type="button" class="dashboard-stat dashboard-stat-button" data-dashboard-action="working-now"><div class="dashboard-stat-label">현재 근무 중</div><div class="dashboard-stat-value">${clockedIn}<span style="font-size:13px;margin-left:3px;">명</span></div><div class="dashboard-stat-note">눌러서 부서별 근무자 확인</div></button>
+    <div class="dashboard-stat"><div class="dashboard-stat-label">오늘 올라온 글</div><div class="dashboard-stat-value">${todayPosts}<span style="font-size:13px;margin-left:3px;">개</span></div><div class="dashboard-stat-note">Team Talk · 공지사항 · 인수인계</div></div>
+    <button type="button" class="dashboard-stat dashboard-stat-button ${canOpenLeave?'':'locked'}" data-dashboard-action="pending-leave"><div class="dashboard-stat-label">승인 대기 연차</div><div class="dashboard-stat-value">${pending}<span style="font-size:13px;margin-left:3px;">건</span></div><div class="dashboard-stat-note">${pendingNote}</div></button>`;
+
+  overview.innerHTML = `
+    <div class="dashboard-overview-item"><span>등록 직원</span><span>${employees.length}명</span></div>
+    <button type="button" class="dashboard-overview-item" data-dashboard-action="working-now"><span>현재 근무 중</span><span>${clockedIn}명</span></button>
+    <button type="button" class="dashboard-overview-item" data-dashboard-action="closing"><span>${actor===OWNER_NAME?'오늘 전체 마감보고':'오늘 우리 팀 마감보고'}</span><span>${actor?closingCount+'건':'로그인'}</span></button>
+    <button type="button" class="dashboard-overview-item" data-dashboard-action="pending-leave"><span>연차 승인 대기</span><span>${pending}건</span></button>`;
+}
+
+function renderDashboardFeed(){
+  const feed = document.getElementById('dashboardFeed');
+  if(!feed) return;
+  const filter = document.getElementById('dashboardFeedFilter')?.value || '';
+  const actor = dashboardActor();
+  const posts = dashboardPosts.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))
+    .filter(p=>!filter || p.type===filter);
+  if(posts.length===0){
+    feed.innerHTML = '<div class="empty">아직 올라온 글이 없어요.<br/>첫 공지나 오늘의 이야기를 남겨보세요.</div>';
+    return;
+  }
+  feed.innerHTML = posts.map(post=>{
+    const meta = DASHBOARD_TYPES[post.type] || DASHBOARD_TYPES.daily;
+    const likes = Array.isArray(post.likes) ? post.likes : [];
+    const confirms = Array.isArray(post.confirms) ? post.confirms : [];
+    const comments = Array.isArray(post.comments) ? post.comments : [];
+    const liked = actor && likes.includes(actor);
+    const confirmed = actor && confirms.includes(actor);
+    const isOwner = !!actor && actor===post.author;
+    const commentHtml = comments.slice(-8).map(c=>`<div class="community-comment"><b>${escapeHtml(String(c.author||''))}</b> ${escapeHtml(String(c.content||''))}<span class="community-comment-time">${dashboardTimeLabel(c.createdAt)}</span></div>`).join('');
+    const reactionParts = [];
+    if(likes.length) reactionParts.push('좋아요: '+escapeHtml(dashboardNamesSummary(likes)));
+    if(confirms.length) reactionParts.push('확인: '+escapeHtml(dashboardNamesSummary(confirms)));
+    return `<article class="community-card ${escapeHtml(post.type||'daily')}" data-id="${escapeHtml(String(post.id))}">
+      <div class="community-head">
+        <div>
+          <div class="community-category">${meta.icon} ${meta.label}</div>
+          <div class="community-title">${escapeHtml(dashboardPostTitle(post))}</div>
+        </div>
+        <div class="community-meta">${escapeHtml(String(post.author||''))} · ${escapeHtml(String(post.authorDept||deptOf(post.author||'')))}<br/>${dashboardTimeLabel(post.createdAt)}${post.updatedAt?'<span class="edited-label">(수정됨)</span>':''}</div>
+      </div>
+      <div class="community-body">${escapeHtml(String(post.content||'')).replace(/\n/g,'<br>')}</div>
+      <div class="community-actions">
+        <button type="button" class="community-action like-post ${liked?'active':''}" data-id="${escapeHtml(String(post.id))}">♡ 좋아요 ${likes.length}</button>
+        <button type="button" class="community-action confirm confirm-post ${confirmed?'active':''}" data-id="${escapeHtml(String(post.id))}">✓ 확인 ${confirms.length}</button>
+        <button type="button" class="community-action" disabled>💬 댓글 ${comments.length}</button>
+        ${isOwner ? `<span class="content-owner-actions"><button type="button" class="content-owner-action edit-dashboard-post" data-id="${escapeHtml(String(post.id))}">수정</button><button type="button" class="content-owner-action delete delete-dashboard-post" data-id="${escapeHtml(String(post.id))}">삭제</button></span>` : ''}
+      </div>
+      ${reactionParts.length ? `<div class="community-reaction-summary">${reactionParts.join(' · ')}</div>` : ''}
+      <div class="community-comments">
+        ${commentHtml || '<div class="community-comment" style="color:var(--muted);">첫 댓글을 남겨보세요.</div>'}
+        <div class="comment-compose">
+          <input class="comment-input" data-id="${escapeHtml(String(post.id))}" maxlength="300" placeholder="댓글 입력" />
+          <button type="button" class="comment-submit" data-id="${escapeHtml(String(post.id))}">등록</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function renderDashboard(){
+  renderDashboardUserState();
+  renderDashboardStats();
+  renderDashboardFeed();
+}
+
+async function createDashboardPost(){
+  const actor = dashboardActor();
+  const selectedType = document.getElementById('dashboardPostType').value;
+  const type = ['daily','notice','handoff'].includes(selectedType) ? selectedType : 'daily';
+  const title = document.getElementById('dashboardPostTitle').value.trim();
+  const content = document.getElementById('dashboardPostBody').value.trim();
+  if(!actor){ showToast('먼저 직원 로그인을 해주세요.'); return; }
+  if(!content){ showToast('게시할 내용을 입력해주세요.'); return; }
+  dashboardPosts.push({
+    id: Date.now()+'-'+Math.random().toString(36).slice(2,8),
+    type, title, content, author:actor, authorDept:deptOf(actor),
+    createdAt:new Date().toISOString(), likes:[], confirms:[], comments:[]
+  });
+  await saveDashboardPosts();
+  document.getElementById('dashboardPostTitle').value='';
+  document.getElementById('dashboardPostBody').value='';
+  renderDashboardStats();
+  renderDashboardFeed();
+  showToast('대시보드에 글이 올라갔어요.');
+}
+
+async function toggleDashboardReaction(postId, field){
+  const actor = dashboardActor();
+  if(!actor){ showToast('먼저 직원 로그인을 해주세요.'); return; }
+  const post = dashboardPosts.find(p=>String(p.id)===String(postId));
+  if(!post) return;
+  if(!Array.isArray(post[field])) post[field]=[];
+  post[field] = post[field].includes(actor) ? post[field].filter(n=>n!==actor) : [...post[field], actor];
+  await saveDashboardPosts();
+  renderDashboardFeed();
+}
+
+async function addDashboardComment(postId, input){
+  const actor = dashboardActor();
+  const content = (input?.value || '').trim();
+  if(!actor){ showToast('먼저 직원 로그인을 해주세요.'); return; }
+  if(!content){ showToast('댓글 내용을 입력해주세요.'); return; }
+  const post = dashboardPosts.find(p=>String(p.id)===String(postId));
+  if(!post) return;
+  if(!Array.isArray(post.comments)) post.comments=[];
+  post.comments.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,7),author:actor,content,createdAt:new Date().toISOString()});
+  await saveDashboardPosts();
+  renderDashboardFeed();
+  showToast('댓글이 등록됐어요.');
+}
+
+
+function visibleClosingReports(actor=dashboardActor()){
+  if(!actor) return [];
+  if(actor===OWNER_NAME) return closingReports.slice();
+  const emp = dashboardActorEmployee(actor);
+  if(!emp) return [];
+  return closingReports.filter(report=>report.author===actor || (report.authorDept||deptOf(report.author||''))===emp.dept);
+}
+
+function renderClosingReports(){
+  const loginGate = document.getElementById('closingLoginGate');
+  const content = document.getElementById('closingContent');
+  const currentUser = document.getElementById('closingCurrentUser');
+  const composerPanel = document.getElementById('closingComposerPanel');
+  const deptSelect = document.getElementById('closingReportDept');
+  const note = document.getElementById('closingComposerNote');
+  const list = document.getElementById('closingReportList');
+  const listTitle = document.getElementById('closingListTitle');
+  if(!loginGate || !content || !currentUser || !composerPanel || !deptSelect || !note || !list || !listTitle) return;
+
+  const actor = dashboardActor();
+  if(!actor){
+    loginGate.classList.remove('hidden');
+    content.classList.add('hidden');
+    currentUser.innerHTML = '<div class="dashboard-user-caption">마감보고 접근</div><div style="font-size:12px;color:var(--muted);">로그인이 필요해요</div>';
+    lastClosingComposerActor = '';
+    return;
+  }
+
+  loginGate.classList.add('hidden');
+  content.classList.remove('hidden');
+  const emp = dashboardActorEmployee(actor);
+  const actorDept = actor===OWNER_NAME ? '전체 팀 열람' : (emp?.dept||'기타');
+  currentUser.innerHTML = `<div class="dashboard-user-caption">현재 사용자</div><div class="dashboard-user-name">${escapeHtml(actor)}</div><div class="dashboard-user-meta">${escapeHtml(actorDept)}</div>`;
+
+  if(actor===OWNER_NAME){
+    composerPanel.classList.add('hidden');
+    deptSelect.classList.add('hidden');
+    deptSelect.innerHTML = '';
+    note.textContent = '';
+    listTitle.textContent = '전체 팀 누적 마감보고';
+  }else{
+    composerPanel.classList.remove('hidden');
+    deptSelect.classList.add('hidden');
+    deptSelect.innerHTML = '';
+    note.textContent = `${actorDept} 팀과 대표님만 이 보고를 확인할 수 있어요.`;
+    listTitle.textContent = `${actorDept} 팀 누적 마감보고`;
+    if(lastClosingComposerActor!==actor){
+      resetClosingComposer(actor);
+      lastClosingComposerActor = actor;
+    }
+  }
+
+  const reports = visibleClosingReports(actor).map(normalizeClosingReport).sort((a,b)=>{
+    const byReportDate = String(b.reportDate||'').localeCompare(String(a.reportDate||''));
+    return byReportDate || String(b.createdAt).localeCompare(String(a.createdAt));
+  });
+  if(!reports.length){
+    list.innerHTML = '<div class="empty">아직 확인할 수 있는 마감보고가 없어요.</div>';
+    return;
+  }
+  list.innerHTML = reports.map(report=>{
+    const isOwner = report.author===actor;
+    const likes = Array.isArray(report.likes) ? report.likes : [];
+    const comments = Array.isArray(report.comments) ? report.comments : [];
+    const liked = actor===OWNER_NAME && likes.includes(OWNER_NAME);
+    const commentHtml = comments.slice(-20).map(c=>`<div class="community-comment"><b>${escapeHtml(String(c.author||''))}</b> ${escapeHtml(String(c.content||''))}<span class="community-comment-time">${dashboardTimeLabel(c.createdAt)}</span></div>`).join('');
+    const ownerReactionHtml = actor===OWNER_NAME ? `<div class="closing-owner-reactions">
+      <div class="community-actions">
+        <button type="button" class="community-action like-closing-report ${liked?'active':''}" data-id="${escapeHtml(String(report.id))}">♡ 좋아요 ${likes.length}</button>
+        <button type="button" class="community-action" disabled>💬 댓글 ${comments.length}</button>
+      </div>
+      <div class="community-comments">
+        ${commentHtml || '<div class="community-comment" style="color:var(--muted);">이 보고에 댓글을 남겨보세요.</div>'}
+        <div class="comment-compose">
+          <input class="comment-input closing-comment-input" data-id="${escapeHtml(String(report.id))}" maxlength="300" placeholder="대표님 댓글 입력" />
+          <button type="button" class="comment-submit closing-comment-submit" data-id="${escapeHtml(String(report.id))}">등록</button>
+        </div>
+      </div>
+    </div>` : (commentHtml ? `<div class="community-comments">${commentHtml}</div>` : '');
+    return `<article class="closing-card" data-id="${escapeHtml(String(report.id))}">
+      <div class="closing-card-head">
+        <div>
+          <div class="closing-team-badge">${escapeHtml(String(report.authorDept||'기타'))} 팀</div>
+          <div class="closing-card-title">${escapeHtml(closingReportDisplayTitle(report))}</div>
+        </div>
+        <div class="closing-card-meta">${escapeHtml(String(report.author||''))}<br/>${dashboardTimeLabel(report.createdAt)}${report.updatedAt?'<span class="edited-label">(수정됨)</span>':''}</div>
+      </div>
+      <div class="closing-card-body">
+        ${escapeHtml(String(report.content||'')).replace(/\n/g,'<br>')}
+        ${report.photo ? `<img src="${report.photo}" class="closing-report-photo" data-full="${report.photo}" alt="${escapeHtml(closingReportDisplayTitle(report))} 본문 사진">` : ''}
+      </div>
+      ${ownerReactionHtml}
+      ${isOwner ? `<div class="closing-card-actions"><button type="button" class="content-owner-action edit-closing-report" data-id="${escapeHtml(String(report.id))}">수정</button><button type="button" class="content-owner-action delete delete-closing-report" data-id="${escapeHtml(String(report.id))}">삭제</button></div>` : ''}
+    </article>`;
+  }).join('');
+}
+
+async function createClosingReport(){
+  const actor = dashboardActor();
+  if(!actor){ openDashboardLogin('closing'); return; }
+  if(actor===OWNER_NAME){ showToast('대표님은 누적 마감보고 열람과 댓글·좋아요만 사용할 수 있어요.'); return; }
+  const reportDate = document.getElementById('closingReportDate').value;
+  const title = document.getElementById('closingReportTitle').value.trim();
+  const content = document.getElementById('closingReportBody').value.trim();
+  if(!reportDate){ showToast('마감보고 날짜를 선택해주세요.'); return; }
+  if(!content){ showToast('마감보고 내용을 입력해주세요.'); return; }
+  const targetDept = dashboardActorEmployee(actor)?.dept || '기타';
+  closingReports.push(normalizeClosingReport({
+    id:Date.now()+'-'+Math.random().toString(36).slice(2,8),
+    reportDate, title, content, photo:pendingClosingPhoto || null,
+    author:actor, authorDept:targetDept,
+    likes:[], comments:[], createdAt:new Date().toISOString(), updatedAt:''
+  }));
+  await saveClosingReports();
+  resetClosingComposer(actor);
+  renderClosingReports();
+  renderDashboardStats();
+  showToast('마감보고가 누적 저장됐어요.');
+}
+
+async function toggleClosingReportLike(reportId){
+  const actor = dashboardActor();
+  if(actor!==OWNER_NAME){ showToast('대표님만 마감보고에 좋아요를 누를 수 있어요.'); return; }
+  const report = closingReports.find(r=>String(r.id)===String(reportId));
+  if(!report) return;
+  if(!Array.isArray(report.likes)) report.likes=[];
+  report.likes = report.likes.includes(OWNER_NAME) ? report.likes.filter(n=>n!==OWNER_NAME) : [...report.likes, OWNER_NAME];
+  await saveClosingReports();
+  renderClosingReports();
+}
+
+async function addClosingReportComment(reportId, input){
+  const actor = dashboardActor();
+  if(actor!==OWNER_NAME){ showToast('대표님만 마감보고에 댓글을 남길 수 있어요.'); return; }
+  const content = (input?.value||'').trim();
+  if(!content){ showToast('댓글 내용을 입력해주세요.'); return; }
+  const report = closingReports.find(r=>String(r.id)===String(reportId));
+  if(!report) return;
+  if(!Array.isArray(report.comments)) report.comments=[];
+  report.comments.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,7),author:OWNER_NAME,content,createdAt:new Date().toISOString()});
+  await saveClosingReports();
+  renderClosingReports();
+  showToast('댓글이 등록됐어요.');
+}
+
+function openContentEdit(kind, id){
+  const actor = dashboardActor();
+  if(!actor){ showToast('먼저 직원 로그인을 해주세요.'); return; }
+  const collection = kind==='closing' ? closingReports : dashboardPosts;
+  const item = collection.find(p=>String(p.id)===String(id));
+  if(!item || item.author!==actor){ showToast('내가 작성한 글만 수정할 수 있어요.'); return; }
+  contentEditTarget = {kind, id:String(id)};
+  document.getElementById('contentEditTitleLabel').textContent = kind==='closing' ? '마감보고 수정' : '커뮤니티 글 수정';
+  document.getElementById('contentEditTitle').value = item.title||'';
+  document.getElementById('contentEditBody').value = item.content||'';
+  const typeRow = document.getElementById('contentEditTypeRow');
+  const deptRow = document.getElementById('contentEditDeptRow');
+  const dateRow = document.getElementById('contentEditDateRow');
+  const photoRow = document.getElementById('contentEditPhotoRow');
+  if(kind==='dashboard'){
+    typeRow.classList.remove('hidden');
+    deptRow.classList.add('hidden');
+    dateRow.classList.add('hidden');
+    photoRow.classList.add('hidden');
+    pendingContentEditPhoto = null;
+    document.getElementById('contentEditType').value = ['daily','notice','handoff'].includes(item.type) ? item.type : 'daily';
+  }else{
+    typeRow.classList.add('hidden');
+    deptRow.classList.add('hidden');
+    dateRow.classList.remove('hidden');
+    photoRow.classList.remove('hidden');
+    document.getElementById('contentEditDate').value = item.reportDate || localDateKey(item.createdAt||new Date().toISOString());
+    pendingContentEditPhoto = item.photo || null;
+    document.getElementById('contentEditPhoto').value = '';
+    const preview = document.getElementById('contentEditPhotoPreview');
+    if(pendingContentEditPhoto){
+      document.getElementById('contentEditPhotoPreviewImg').src = pendingContentEditPhoto;
+      preview.classList.remove('hidden');
+    }else{
+      preview.classList.add('hidden');
+    }
+  }
+  document.getElementById('contentEditOverlay').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('contentEditTitle').focus(),50);
+}
+
+function closeContentEdit(){
+  contentEditTarget = null;
+  pendingContentEditPhoto = null;
+  document.getElementById('contentEditOverlay').classList.add('hidden');
+}
+
+async function saveContentEdit(){
+  if(!contentEditTarget) return;
+  const actor = dashboardActor();
+  const {kind,id} = contentEditTarget;
+  const collection = kind==='closing' ? closingReports : dashboardPosts;
+  const item = collection.find(p=>String(p.id)===String(id));
+  if(!actor || !item || item.author!==actor){ closeContentEdit(); showToast('내가 작성한 글만 수정할 수 있어요.'); return; }
+  const title = document.getElementById('contentEditTitle').value.trim();
+  const content = document.getElementById('contentEditBody').value.trim();
+  if(!content){ showToast('내용을 입력해주세요.'); return; }
+  item.title = title;
+  item.content = content;
+  item.updatedAt = new Date().toISOString();
+  if(kind==='dashboard'){
+    const type = document.getElementById('contentEditType').value;
+    item.type = ['daily','notice','handoff'].includes(type) ? type : 'daily';
+    await saveDashboardPosts();
+    renderDashboardFeed();
+  }else{
+    const reportDate = document.getElementById('contentEditDate').value;
+    if(!reportDate){ showToast('마감보고 날짜를 선택해주세요.'); return; }
+    item.reportDate = reportDate;
+    item.photo = pendingContentEditPhoto || null;
+    await saveClosingReports();
+    renderClosingReports();
+    renderDashboardStats();
+  }
+  closeContentEdit();
+  showToast('글이 수정됐어요.');
+}
+
+async function deleteOwnedContent(kind, id){
+  const actor = dashboardActor();
+  const collection = kind==='closing' ? closingReports : dashboardPosts;
+  const item = collection.find(p=>String(p.id)===String(id));
+  if(!actor || !item || item.author!==actor){ showToast('내가 작성한 글만 삭제할 수 있어요.'); return; }
+  const ok = await askConfirm(kind==='closing' ? '이 마감보고를 삭제할까요?' : '이 커뮤니티 글을 삭제할까요?');
+  if(!ok) return;
+  if(kind==='closing'){
+    closingReports = closingReports.filter(p=>String(p.id)!==String(id));
+    await saveClosingReports();
+    renderClosingReports();
+    renderDashboardStats();
+  }else{
+    dashboardPosts = dashboardPosts.filter(p=>String(p.id)!==String(id));
+    await saveDashboardPosts();
+    renderDashboardStats();
+    renderDashboardFeed();
+  }
+  showToast('글이 삭제됐어요.');
+}
+
+function renderKiosk(){
+  const grid = document.getElementById('employeeGrid');
+  const empty = document.getElementById('kioskEmpty');
+  empty.classList.add('hidden');
+
+  const groups = {};
+  DEPTS.forEach(d=>groups[d]=[]);
+  employees.forEach(e=>{
+    if(!groups[e.dept]) groups[e.dept]=[];
+    groups[e.dept].push(e.name);
+  });
+
+  let sectionsHtml = '';
+  DEPTS.forEach(dept=>{
+    const names = groups[dept];
+    if(!names || names.length===0) return;
+    const cards = names.map(name=>{
+      const emp = employees.find(x=>x.name===name);
+      const evs = todayEventsFor(name).sort((a,b)=>a.ts.localeCompare(b.ts));
+      const last = evs[evs.length-1];
+      let statusClass='none', statusLabel='기록 없음', timeStr='';
+      if(last){
+        statusClass = last.type==='in' ? 'in' : 'out';
+        statusLabel = last.type==='in' ? '출근중' : '퇴근함';
+        timeStr = timeLabel(new Date(last.ts));
+      }
+      const dobMissing = !emp || !emp.dob;
+      const posLabel = emp ? (emp.position||'사원') : '';
+      const hasPendingLeave = leaveApplications.some(a=>a.name===name && a.status==='pending');
+      return `<div class="emp-card" data-name="${escapeHtml(name)}">
+        <div class="name">${escapeHtml(name)} <span class="position-tag">${escapeHtml(posLabel)}</span></div>
+        <span class="status ${statusClass}">${statusLabel}</span>
+        <div class="last-time">${timeStr}</div>
+        ${dobMissing ? '<div class="dob-missing">생년월일 미설정</div>' : ''}
+        ${hasPendingLeave ? '<div class="dob-missing" style="color:var(--brass-dark);">연차 승인대기</div>' : ''}
+      </div>`;
+    }).join('');
+    sectionsHtml += `<div class="dept-section">
+      <div class="dept-heading">${dept} <span class="count">${names.length}명</span></div>
+      <div class="card-grid">${cards}</div>
+    </div>`;
+  });
+
+  const addCardHtml = `<div class="dept-section">
+    <div class="card-grid"><div class="emp-card add-card" id="addEmpCard"><div class="plus">+</div>직원 추가</div></div>
+  </div>`;
+
+  grid.innerHTML = `<div class="dept-sections">${sectionsHtml}${addCardHtml}</div>`;
+  grid.querySelectorAll('.emp-card:not(.add-card)').forEach(card=>{
+    card.addEventListener('click', ()=>openModal(card.dataset.name));
+  });
+  document.getElementById('addEmpCard').addEventListener('click', addEmployeeQuick);
+}
+
+function addEmployeeQuick(){
+  document.getElementById('quickAddDept').innerHTML = deptOptionsHtml(DEPTS[0]);
+  document.getElementById('quickAddType').innerHTML = empTypeOptionsHtml('정규직');
+  document.getElementById('quickAddPosition').innerHTML = positionOptionsHtml('사원');
+  openAddEmpModal();
+}
+
+async function submitQuickAdd(name, dept, dob, employmentType, position, hireDate){
+  if(!name) return;
+  if(empNames().includes(name)){ showToast('이미 등록된 이름이에요.'); return; }
+  employees.push({
+    name, dept: dept || '기타', dob: dob || '', hireDate: hireDate || '',
+    employmentType: employmentType || '정규직', position: position || '사원', regularSince: ''
+  });
+  await saveEmployees();
+  renderKiosk();
+  renderAdmin();
+  renderDashboard();
+  closeAddEmpModal();
+  showToast(name+' 님이 추가됐어요.');
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function openModal(name){
+  currentEmp = name;
+  document.getElementById('modalEmpName').textContent = name;
+  document.getElementById('stampFx').classList.add('hidden');
+  document.getElementById('punchStep').classList.add('hidden');
+  document.getElementById('dobInput').value='';
+  document.getElementById('clockInBtn').disabled=false;
+  document.getElementById('clockOutBtn').disabled=false;
+
+  const emp = employees.find(e=>e.name===name);
+  if(emp && emp.dob){
+    document.getElementById('verifyStep').classList.remove('hidden');
+    document.getElementById('verifyBlocked').classList.add('hidden');
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(()=>{ document.getElementById('dobInput').focus(); }, 50);
+  }else{
+    document.getElementById('verifyStep').classList.add('hidden');
+    document.getElementById('verifyBlocked').classList.remove('hidden');
+    document.getElementById('modalOverlay').classList.remove('hidden');
+  }
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.add('hidden');
+  currentEmp=null;
+}
+
+function updatePunchButtonsState(){
+  if(!currentEmp) return;
+  const evs = todayEventsFor(currentEmp);
+  const hasIn = evs.some(ev=>ev.type==='in');
+  const hasOut = evs.some(ev=>ev.type==='out');
+  const inBtn = document.getElementById('clockInBtn');
+  const outBtn = document.getElementById('clockOutBtn');
+  inBtn.disabled = hasIn;
+  outBtn.disabled = hasOut;
+  inBtn.title = hasIn ? '오늘 이미 출근을 기록했어요.' : '';
+  outBtn.title = hasOut ? '오늘 이미 퇴근을 기록했어요.' : '';
+}
+
+function verifyDob(){
+  const emp = employees.find(e=>e.name===currentEmp);
+  if(!emp) return;
+  const entered = document.getElementById('dobInput').value.trim();
+  if(entered !== emp.dob){
+    showToast('생년월일이 일치하지 않아요.');
+    document.getElementById('dobInput').value='';
+    document.getElementById('dobInput').focus();
+    return;
+  }
+  document.getElementById('verifyStep').classList.add('hidden');
+  document.getElementById('punchStep').classList.remove('hidden');
+  document.getElementById('modalTime').textContent = timeLabel(new Date());
+  updatePunchButtonsState();
+}
+
+async function punch(type){
+  if(!currentEmp) return;
+  const already = todayEventsFor(currentEmp).some(ev=>ev.type===type);
+  if(already){
+    showToast(type==='in' ? '오늘 이미 출근을 기록했어요.' : '오늘 이미 퇴근을 기록했어요.');
+    updatePunchButtonsState();
+    return;
+  }
+  document.getElementById('clockInBtn').disabled=true;
+  document.getElementById('clockOutBtn').disabled=true;
+  const now = new Date();
+  log.push({name:currentEmp, type, ts: now.toISOString()});
+  await saveLog();
+  const fx = document.getElementById('stampFx');
+  fx.innerHTML = `<div class="ring">${type==='in'?'출근':'퇴근'}<br/>${timeLabel(now)}</div>`;
+  fx.classList.remove('hidden');
+  renderKiosk();
+  renderTable();
+  renderDashboardStats();
+  setTimeout(()=>{ closeModal(); }, 900);
+}
+
+function buildMonthRows(monthKey, empFilterVal, deptFilterVal, specificDate=''){
+  const byDayName = {};
+  log.forEach(ev=>{
+    const dk = localDateKey(ev.ts);
+    if(specificDate){
+      if(dk!==specificDate) return;
+    }else if(monthKeyOf(dk)!==monthKey) return;
+    if(empFilterVal && ev.name!==empFilterVal) return;
+    if(deptFilterVal && deptOf(ev.name)!==deptFilterVal) return;
+    const key = dk+'|'+ev.name;
+    if(!byDayName[key]) byDayName[key] = {date:dk, name:ev.name, dept:deptOf(ev.name), inTs:null, outTs:null};
+    const row = byDayName[key];
+    if(ev.type==='in'){
+      if(!row.inTs || ev.ts < row.inTs) row.inTs = ev.ts;
+    }else{
+      if(!row.outTs || ev.ts > row.outTs) row.outTs = ev.ts;
+    }
+  });
+  return Object.values(byDayName).sort((a,b)=>{
+    if(a.dept!==b.dept) return a.dept.localeCompare(b.dept,'ko');
+    if(a.date!==b.date) return a.date.localeCompare(b.date);
+    return a.name.localeCompare(b.name,'ko');
+  });
+}
+
+// 4시간 이상 근무 시 30분, 8시간 이상 근무 시 1시간 휴게
+function computeWork(row){
+  if(!row.inTs || !row.outTs) return {gross:null, brk:0, net:null};
+  const ms = new Date(row.outTs) - new Date(row.inTs);
+  if(ms<=0) return {gross:null, brk:0, net:null};
+  const gross = ms/3600000;
+  let brk = 0;
+  if(gross>=8) brk = 1;
+  else if(gross>=4) brk = 0.5;
+  const net = Math.max(gross-brk, 0);
+  return {gross, brk, net};
+}
+function breakLabel(row){
+  const w = computeWork(row);
+  if(w.gross===null) return '-';
+  return w.brk>0 ? (w.brk===1 ? '1시간' : '30분') : '-';
+}
+function hoursLabel(row){
+  const w = computeWork(row);
+  if(w.net===null) return '-';
+  return w.net.toFixed(1)+'시간';
+}
+
+function refreshFilterDropdowns(){
+  const deptFilter = document.getElementById('deptFilter');
+  const empFilter = document.getElementById('empFilter');
+  const prevVal = empFilter.value;
+  const namesForFilter = deptFilter.value
+    ? employees.filter(e=>e.dept===deptFilter.value).map(e=>e.name)
+    : empNames();
+  empFilter.innerHTML = '<option value="">전체 직원</option>' +
+    namesForFilter.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  empFilter.value = namesForFilter.includes(prevVal) ? prevVal : '';
+}
+
+function renderEmpList(){
+  const term = (document.getElementById('empSearch').value || '').trim().toLowerCase();
+  const filtered = sortByDeptName(employees.filter(e=>{
+    if(!term) return true;
+    return e.name.toLowerCase().includes(term)
+      || e.dept.toLowerCase().includes(term)
+      || (e.position||'사원').toLowerCase().includes(term);
+  }));
+
+  const empListEl = document.getElementById('empList');
+  if(employees.length===0){
+    empListEl.innerHTML = '<li style="color:var(--muted);background:transparent;">등록된 직원이 없어요</li>';
+    return;
+  }
+  if(filtered.length===0){
+    empListEl.innerHTML = '<li style="color:var(--muted);background:transparent;">검색 결과가 없어요</li>';
+    return;
+  }
+
+  empListEl.innerHTML = filtered.map(e=>{
+    const dobLabel = e.dob || '미설정';
+    const hireDateLabel = e.hireDate || '미등록';
+    const dobStyle = e.dob ? '' : 'color:var(--out-clay);font-weight:700;';
+    const hireDateStyle = e.hireDate ? '' : 'color:var(--out-clay);font-weight:700;';
+    return `
+    <li data-original-name="${escapeHtml(e.name)}">
+      <div class="emp-view">
+        <div class="emp-view-top">
+          <div class="emp-summary-main">
+            <span class="emp-view-name">${escapeHtml(e.name)}</span>
+            <span class="dept-pill">${escapeHtml(e.dept)}</span>
+          </div>
+          <button class="emp-detail-btn" type="button" aria-expanded="false">상세</button>
+        </div>
+        <div class="emp-detail hidden">
+          <div class="emp-detail-row">
+            <span class="emp-detail-label">직위</span>
+            <span class="emp-detail-value">${escapeHtml(e.position||'사원')}</span>
+          </div>
+          <div class="emp-detail-row">
+            <span class="emp-detail-label">생년월일</span>
+            <span class="emp-detail-value" style="${dobStyle}">${escapeHtml(dobLabel)}</span>
+          </div>
+          <div class="emp-detail-row">
+            <span class="emp-detail-label">입사일</span>
+            <span class="emp-detail-value" style="${hireDateStyle}">${escapeHtml(hireDateLabel)}</span>
+          </div>
+          <div class="emp-detail-actions">
+            <button class="edit-emp-btn" type="button" title="직원 정보 편집" aria-label="직원 정보 편집">✏️</button>
+          </div>
+        </div>
+      </div>
+      <div class="emp-edit hidden">
+        <label class="emp-field-label">이름</label>
+        <input class="name-edit-input" value="${escapeHtml(e.name)}" placeholder="이름" />
+        <div class="emp-row-bottom">
+          <div style="flex:1;">
+            <label class="emp-field-label">부서</label>
+            <select class="dept-edit-select" style="width:100%;">${deptOptionsHtml(e.dept)}</select>
+          </div>
+          <div style="flex:1;">
+            <label class="emp-field-label">고용형태</label>
+            <select class="type-edit-select" style="width:100%;">${empTypeOptionsHtml(e.employmentType)}</select>
+          </div>
+          <div style="flex:1;">
+            <label class="emp-field-label">직위</label>
+            <select class="position-edit-select" style="width:100%;">${positionOptionsHtml(e.position)}</select>
+          </div>
+        </div>
+        <label class="emp-field-label">생년월일 (6자리)</label>
+        <input class="dob-edit-input num" type="tel" inputmode="numeric" maxlength="6" placeholder="예: 990101" value="${escapeHtml(e.dob||'')}" />
+        <label class="emp-field-label">입사일</label>
+        <input class="hire-date-edit-input num" type="date" value="${escapeHtml(e.hireDate||'')}" />
+        ${currentAdminName === OWNER_NAME ? `
+        <label class="emp-field-label">권한 (대표님만 설정 가능)</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);margin-top:2px;">
+          <input type="checkbox" class="can-edit-log-checkbox" ${e.canEditLog ? 'checked' : ''} style="width:16px;height:16px;">
+          출퇴근 기록 편집 권한
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);margin-top:7px;">
+          <input type="checkbox" class="can-approve-leave-checkbox" ${e.canApproveLeave ? 'checked' : ''} style="width:16px;height:16px;">
+          연월차 승인·거절 권한
+        </label>
+        <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.45;">연월차 권한은 같은 부서 직원의 신청에만 적용돼요.</div>` : ''}
+        <div class="emp-row-actions">
+          <button class="save-row" type="button">저장</button>
+          <button class="cancel-edit-row" type="button">취소</button>
+          <button class="rm-emp" type="button">삭제</button>
+        </div>
+      </div>
+    </li>`;
+  }).join('');
+
+  empListEl.querySelectorAll('li[data-original-name]').forEach(li=>{
+    const originalName = li.dataset.originalName;
+    const view = li.querySelector('.emp-view');
+    const detail = li.querySelector('.emp-detail');
+    const detailBtn = li.querySelector('.emp-detail-btn');
+    const edit = li.querySelector('.emp-edit');
+
+    const toggleDetail = ()=>{
+      const willOpen = detail.classList.contains('hidden');
+      detail.classList.toggle('hidden', !willOpen);
+      detailBtn.textContent = willOpen ? '닫기' : '상세';
+      detailBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    };
+    const enterEdit = ()=>{
+      view.classList.add('hidden');
+      edit.classList.remove('hidden');
+    };
+    const exitEdit = ()=>{
+      edit.classList.add('hidden');
+      view.classList.remove('hidden');
+      detail.classList.remove('hidden');
+      detailBtn.textContent = '닫기';
+      detailBtn.setAttribute('aria-expanded', 'true');
+    };
+
+    detailBtn.addEventListener('click', toggleDetail);
+    li.querySelector('.edit-emp-btn').addEventListener('click', enterEdit);
+    li.querySelector('.cancel-edit-row').addEventListener('click', exitEdit);
+
+    li.querySelector('.rm-emp').addEventListener('click', async ()=>{
+      const ok = await askConfirm(originalName+' 직원을 목록에서 삭제할까요? (기존 기록은 남아있어요)');
+      if(!ok) return;
+      employees = employees.filter(e=>e.name!==originalName);
+      await saveEmployees();
+      renderEmpList(); renderKiosk();
+      refreshFilterDropdowns();
+      renderTable();
+      renderLeave();
+    });
+
+    const runSaveRow = async ()=>{
+      const newName = li.querySelector('.name-edit-input').value.trim();
+      const newDept = li.querySelector('.dept-edit-select').value;
+      const newType = li.querySelector('.type-edit-select').value;
+      const newPosition = li.querySelector('.position-edit-select').value;
+      const newDob = li.querySelector('.dob-edit-input').value.trim();
+      const newHireDate = li.querySelector('.hire-date-edit-input').value;
+
+      if(!newName){ showToast('이름을 입력해주세요.'); return; }
+      if(newDob && !/^\d{6}$/.test(newDob)){ showToast('생년월일은 6자리 숫자로 입력해주세요.'); return; }
+      if(newName !== originalName && empNames().includes(newName)){ showToast('이미 등록된 이름이에요.'); return; }
+
+      const emp = employees.find(e=>e.name===originalName);
+      if(!emp) return;
+      const nameChanged = newName !== originalName;
+      emp.name = newName;
+      emp.dept = newDept;
+      emp.employmentType = newType;
+      emp.position = newPosition;
+      emp.dob = newDob;
+      emp.hireDate = newHireDate;
+      const canEditLogCheckbox = li.querySelector('.can-edit-log-checkbox');
+      if(canEditLogCheckbox){ emp.canEditLog = canEditLogCheckbox.checked; }
+      const canApproveLeaveCheckbox = li.querySelector('.can-approve-leave-checkbox');
+      if(canApproveLeaveCheckbox){ emp.canApproveLeave = canApproveLeaveCheckbox.checked; }
+
+      if(nameChanged){
+        if(sessionStorage.getItem('dashboard-actor')===originalName){ sessionStorage.setItem('dashboard-actor', newName); }
+        if(currentAdminName===originalName){ currentAdminName = newName; }
+        log.forEach(ev=>{ if(ev.name===originalName) ev.name = newName; });
+        leaveRequests.forEach(r=>{ if(r.name===originalName) r.name = newName; });
+        leaveApplications.forEach(a=>{ if(a.name===originalName) a.name = newName; });
+        await saveLog();
+        await saveLeaveRequests();
+        await saveLeaveApplications();
+      }
+      await saveEmployees();
+      showToast(newName+' 정보가 저장됐어요.');
+      renderEmpList();
+      renderKiosk();
+      renderDashboard();
+      renderClosingReports();
+      renderLeave();
+      renderLeaveApprovals();
+      refreshFilterDropdowns();
+      renderTable();
+    };
+    li.querySelector('.save-row').addEventListener('click', runSaveRow);
+    li.querySelector('.dob-edit-input').addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); runSaveRow(); }
+    });
+    li.querySelector('.hire-date-edit-input').addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); runSaveRow(); }
+    });
+    li.querySelector('.name-edit-input').addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); runSaveRow(); }
+    });
+  });
+}
+
+// 입사일 기준 연차/월차 계산
+// - 첫 해: 만근 월 1일씩 최대 11일(월차) 적립
+// - 만 1년 이후: 그 월차(11일)와 별도로 연차 15일이 새로 발생, 3년차부터 2년마다 1일 가산(최대 25일)
+function leaveAnchorDate(emp){
+  return emp.hireDate || '';
+}
+
+// 고용형태별 계산
+// - 정규직: 첫 해 만근 월 1일씩(최대 11일) + 만 1년 이후 연차 15일부터(3년차마다 가산, 최대 25일)
+// - 계약직 / 파트타이머(주 15시간 이상 근무): 매달 1일씩, 상한 없음
+function calcLeave(emp){
+  const anchorStr = leaveAnchorDate(emp);
+  if(!anchorStr) return null;
+  const hire = new Date(anchorStr+'T00:00:00');
+  const now = new Date();
+  if(isNaN(hire.getTime()) || hire > now) return null;
+  let months = (now.getFullYear()-hire.getFullYear())*12 + (now.getMonth()-hire.getMonth());
+  if(now.getDate() < hire.getDate()) months--;
+  months = Math.max(months, 0);
+  const years = Math.floor(months/12);
+  const empType = emp.employmentType || '정규직';
+
+  if(empType !== '정규직'){
+    return { years, months, type:'월차', accrued: months, monthlyPortion: months, annualPortion: 0 };
+  }
+
+  const monthlyPortion = Math.min(months, 11);
+  const annualPortion = years >= 1 ? Math.min(15 + Math.floor((years-1)/2), 25) : 0;
+  const accrued = monthlyPortion + annualPortion;
+  const type = years >= 1 ? '연차+월차' : '월차';
+  return { years, months, type, accrued, monthlyPortion, annualPortion };
+}
+
+// 입사 기념일 기준 "이번 주기" 시작일 (가장 최근 기념일)
+function cycleStartFor(hireDateStr){
+  const hire = new Date(hireDateStr+'T00:00:00');
+  const now = new Date();
+  let anniv = new Date(now.getFullYear(), hire.getMonth(), hire.getDate());
+  if(anniv > now) anniv.setFullYear(anniv.getFullYear()-1);
+  return anniv;
+}
+
+function entryKind(r){ return r.kind || 'use'; } // 예전 데이터는 kind 없으면 '사용'으로 취급
+
+function usedForCurrentCycle(emp){
+  if(!emp.hireDate) return 0;
+  const start = cycleStartFor(leaveAnchorDate(emp));
+  return leaveRequests
+    .filter(r=>r.name===emp.name && entryKind(r)==='use' && new Date(r.date+'T00:00:00') >= start)
+    .reduce((sum,r)=>sum+r.amount, 0);
+}
+function adjustForCurrentCycle(emp){
+  if(!emp.hireDate) return 0;
+  const start = cycleStartFor(leaveAnchorDate(emp));
+  return leaveRequests
+    .filter(r=>r.name===emp.name && entryKind(r)==='adjust' && new Date(r.date+'T00:00:00') >= start)
+    .reduce((sum,r)=>sum+r.amount, 0);
+}
+
+function renderLeave(){
+  const tbody = document.getElementById('leaveTbody');
+  if(!tbody) return;
+
+  const deptFilter = document.getElementById('leaveDeptFilter');
+  const prevDept = deptFilter.value;
+  deptFilter.innerHTML = '<option value="">전체 부서</option>' +
+    DEPTS.map(d=>`<option value="${d}">${d}</option>`).join('');
+  deptFilter.value = DEPTS.includes(prevDept) ? prevDept : '';
+
+  let filtered = employees.slice();
+  if(deptFilter.value) filtered = filtered.filter(e=>e.dept===deptFilter.value);
+  filtered = sortByDeptName(filtered);
+
+  if(filtered.length===0){
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--muted);">표시할 직원이 없어요.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(e=>{
+    const info = calcLeave(e);
+    const baseAccrued = info ? info.accrued : 0;
+    const adjust = adjustForCurrentCycle(e);
+    const accrued = Math.max(baseAccrued + adjust, 0);
+    const used = usedForCurrentCycle(e);
+    const remain = Math.max(accrued - used, 0);
+    const tenureLabel = info ? `${info.years}년 ${info.months%12}개월` : '-';
+    const typeLabel = info ? info.type : '-';
+    const accruedLabel = adjust !== 0 ? `${accrued} <span style="color:var(--muted);font-size:10px;">(${baseAccrued}${adjust>0?'+':''}${adjust})</span>` : `${accrued}`;
+    const deleteHistoryButton = canManageLeaveRecords(e.name)
+      ? `<button class="delete-leave-history" type="button" style="color:var(--out-clay);background:transparent;border:1px solid var(--out-clay);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">연차기록삭제</button>`
+      : '';
+    return `<tr data-name="${escapeHtml(e.name)}">
+      <td>${escapeHtml(e.name)}</td>
+      <td><span class="dept-pill">${escapeHtml(e.dept)}</span></td>
+      <td class="num">${e.hireDate ? escapeHtml(e.hireDate) : '<span style="color:var(--out-clay);font-weight:700;">미등록</span>'}</td>
+      <td class="num">${tenureLabel}</td>
+      <td>${typeLabel}</td>
+      <td class="num">${accruedLabel}</td>
+      <td class="num">${used}</td>
+      <td class="num" style="font-weight:700;">${remain}</td>
+      <td><div style="display:flex;gap:4px;flex-wrap:nowrap;align-items:center;">
+        <button class="view-leave-detail" type="button">내역</button>
+        ${deleteHistoryButton}
+      </div></td>
+    </tr>`;
+  }).join('');
+
+
+  tbody.querySelectorAll('.delete-leave-history').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const name = btn.closest('tr').dataset.name;
+      if(!canManageLeaveRecords(name)){
+        showToast('연월차 승인 권한이 있고 같은 팀인 경우에만 연차 기록을 삭제할 수 있어요.');
+        renderLeave();
+        return;
+      }
+      const count = leaveRequests.filter(r=>r.name===name).length;
+      if(count===0){ showToast('삭제할 연차 기록이 없어요.'); return; }
+      const ok = await askConfirm(name+' 님의 연차/월차 사용·조정 기록 '+count+'건을 전부 삭제할까요? (퇴사 처리 등에 사용, 되돌릴 수 없어요)');
+      if(!ok) return;
+      leaveRequests = leaveRequests.filter(r=>r.name!==name);
+      await saveLeaveRequests();
+      showToast(name+' 님 연차 기록이 삭제됐어요.');
+      renderLeave();
+    });
+  });
+
+  tbody.querySelectorAll('.view-leave-detail').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      openLeaveDetail(btn.closest('tr').dataset.name);
+    });
+  });
+}
+
+function compressImageFile(file, maxWidth=1000, quality=0.7){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > maxWidth){ h = Math.round(h * maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = ()=>reject(new Error('image load failed'));
+      img.src = e.target.result;
+    };
+    reader.onerror = ()=>reject(new Error('file read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openPhotoView(src){
+  document.getElementById('photoViewImg').src = src;
+  document.getElementById('photoViewOverlay').classList.remove('hidden');
+}
+function closePhotoView(){
+  document.getElementById('photoViewOverlay').classList.add('hidden');
+}
+
+function updateLeaveEntryUI(){
+  const kind = document.getElementById('leaveEntryKind').value;
+  const isAdjust = kind === 'adjust';
+
+  document.getElementById('leaveDateRangeRow').classList.toggle('hidden', isAdjust);
+  document.getElementById('leaveSingleDateRow').classList.toggle('hidden', !isAdjust);
+  document.getElementById('leaveEntryAdjustAmount').classList.toggle('hidden', !isAdjust);
+
+  if(isAdjust){
+    document.getElementById('quickAmountRow').classList.add('hidden');
+    document.getElementById('leaveEntryAmount').classList.add('hidden');
+    document.getElementById('leaveRangeAmountLabel').classList.add('hidden');
+    return;
+  }
+
+  const start = document.getElementById('leaveEntryStartDate').value;
+  const end = document.getElementById('leaveEntryEndDate').value;
+  if(!start || !end){
+    document.getElementById('quickAmountRow').classList.remove('hidden');
+    document.getElementById('leaveEntryAmount').classList.remove('hidden');
+    document.getElementById('leaveRangeAmountLabel').classList.add('hidden');
+    return;
+  }
+  const diffDays = Math.round((new Date(end+'T00:00:00') - new Date(start+'T00:00:00'))/86400000) + 1;
+  if(diffDays < 1){
+    showToast('종료일이 시작일보다 빠를 수 없어요.');
+    return;
+  }
+  if(diffDays === 1){
+    // 하루짜리: 반차/반반차 등 정밀 입력 가능
+    document.getElementById('quickAmountRow').classList.remove('hidden');
+    document.getElementById('leaveEntryAmount').classList.remove('hidden');
+    document.getElementById('leaveRangeAmountLabel').classList.add('hidden');
+  } else {
+    // 여러 날짜: 자동으로 일수 계산, 하루 단위로 고정
+    document.getElementById('quickAmountRow').classList.add('hidden');
+    document.getElementById('leaveEntryAmount').classList.add('hidden');
+    document.getElementById('leaveRangeAmountLabel').classList.remove('hidden');
+    document.getElementById('leaveRangeAmountValue').textContent = diffDays;
+  }
+}
+
+let leaveApplyKind = '1';
+
+function openLeaveApply(){
+  if(!currentEmp) return;
+  document.getElementById('leaveApplyName').textContent = currentEmp+' 님 연차 신청';
+  const today = dateKey(new Date());
+  document.getElementById('leaveApplyStart').value = today;
+  document.getElementById('leaveApplyEnd').value = today;
+  document.getElementById('leaveApplyReason').value = '';
+  leaveApplyKind = '1';
+  document.querySelectorAll('.leave-apply-kind-btn').forEach(b=>b.classList.toggle('selected', b.dataset.val==='1'));
+  updateLeaveApplyUI();
+  document.getElementById('leaveApplyOverlay').classList.remove('hidden');
+}
+function closeLeaveApply(){
+  document.getElementById('leaveApplyOverlay').classList.add('hidden');
+}
+function updateLeaveApplyUI(){
+  const start = document.getElementById('leaveApplyStart').value;
+  const end = document.getElementById('leaveApplyEnd').value;
+  const single = start && end && start===end;
+  document.getElementById('leaveApplyKindRow').classList.toggle('hidden', !single);
+  document.getElementById('leaveApplyRangeNote').classList.toggle('hidden', single);
+}
+
+async function submitLeaveApplication(){
+  const name = currentEmp;
+  if(!name) return;
+  const start = document.getElementById('leaveApplyStart').value;
+  const end = document.getElementById('leaveApplyEnd').value;
+  const reason = document.getElementById('leaveApplyReason').value.trim();
+  if(!start || !end){ showToast('날짜를 선택해주세요.'); return; }
+  const diffDays = Math.round((new Date(end+'T00:00:00') - new Date(start+'T00:00:00'))/86400000) + 1;
+  if(diffDays < 1){ showToast('종료일이 시작일보다 빠를 수 없어요.'); return; }
+  if(!reason){ showToast('사유를 입력해주세요.'); return; }
+  const amount = diffDays === 1 ? parseFloat(leaveApplyKind) : diffDays;
+
+  leaveApplications.push({
+    id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    name, startDate: start, endDate: end, amount, reason,
+    status: 'pending', requestedAt: new Date().toISOString(),
+    decidedBy: '', decidedAt: ''
+  });
+  await saveLeaveApplications();
+  closeLeaveApply();
+  closeModal();
+  renderKiosk();
+  updatePendingBadges();
+  renderDashboardStats();
+  showToast('연차 신청이 접수됐어요. 승인을 기다려주세요.');
+}
+
+function updatePendingBadges(){
+  const count = leaveApplications.filter(a=>a.status==='pending').length;
+  const tabBadge = document.getElementById('adminTabBadge');
+  const panelBadge = document.getElementById('pendingCountTag');
+  [tabBadge, panelBadge].forEach(el=>{
+    if(!el) return;
+    if(count > 0){ el.textContent = count; el.classList.remove('hidden'); }
+    else{ el.classList.add('hidden'); }
+  });
+}
+
+function currentAdminEmployee(){
+  return employees.find(e=>e.name===currentAdminName) || null;
+}
+
+function canManageLeaveRecords(name){
+  if(currentAdminName === OWNER_NAME) return true;
+  const admin = currentAdminEmployee();
+  const target = employees.find(e=>e.name===name);
+  return !!(
+    admin && target &&
+    admin.canApproveLeave === true &&
+    admin.dept === target.dept
+  );
+}
+
+function canDecideLeaveApplication(app){
+  return !!(app && app.status==='pending' && canManageLeaveRecords(app.name));
+}
+
+function renderLeaveApprovals(){
+  const tbody = document.getElementById('leaveApprovalTbody');
+  if(!tbody) return;
+  updatePendingBadges();
+  if(leaveApplications.length===0){
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);">신청 내역이 없어요.</td></tr>`;
+    return;
+  }
+  const sorted = leaveApplications.slice().sort((a,b)=>{
+    if(a.status==='pending' && b.status!=='pending') return -1;
+    if(a.status!=='pending' && b.status==='pending') return 1;
+    return b.requestedAt.localeCompare(a.requestedAt);
+  });
+  const statusLabel = {pending:'승인대기', approved:'승인됨', rejected:'거절됨'};
+  const statusColor = {pending:'var(--out-clay)', approved:'var(--in-green)', rejected:'var(--muted)'};
+  tbody.innerHTML = sorted.map(a=>{
+    const period = a.startDate===a.endDate ? a.startDate : `${a.startDate} ~ ${a.endDate}`;
+    const canDecide = canDecideLeaveApplication(a);
+    let actions = '';
+    if(a.status==='pending'){
+      actions = canDecide
+        ? `<button class="approve-leave-app" data-id="${a.id}" type="button" style="background:var(--in-green);color:#fff;border:none;padding:5px 10px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">승인</button>
+           <button class="reject-leave-app" data-id="${a.id}" type="button" style="background:transparent;color:var(--out-clay);border:1px solid var(--out-clay);padding:5px 10px;border-radius:6px;font-weight:700;font-size:11px;cursor:pointer;">거절</button>`
+        : `<span class="leave-permission-note">연월차 승인 권한이 없거나<br/>다른 팀 신청입니다</span>`;
+    }else{
+      actions = `<span style="font-size:11px;color:var(--muted);">${escapeHtml(a.decidedBy||'')}</span>`;
+    }
+    return `<tr data-id="${a.id}">
+      <td>${escapeHtml(a.name)}</td>
+      <td><span class="dept-pill">${escapeHtml(deptOf(a.name))}</span></td>
+      <td class="num">${period}</td>
+      <td class="num">${a.amount}</td>
+      <td class="leave-reason-cell">${escapeHtml(a.reason)}</td>
+      <td><span style="color:${statusColor[a.status]};font-weight:700;font-size:12px;">${statusLabel[a.status]}</span></td>
+      <td class="leave-action-cell"><div class="leave-action-group">${actions}</div></td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.approve-leave-app').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const app = leaveApplications.find(a=>a.id===btn.dataset.id);
+      if(!app) return;
+      if(!canDecideLeaveApplication(app)){
+        showToast('대표님이 부여한 연월차 승인 권한이 있고 같은 팀인 경우에만 승인할 수 있어요.');
+        renderLeaveApprovals();
+        return;
+      }
+      const ok = await askConfirm(app.name+' 님의 연차 신청을 승인할까요?');
+      if(!ok) return;
+      leaveRequests.push({
+        id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+        name: app.name, date: app.startDate, endDate: app.endDate, amount: app.amount,
+        reason: app.reason, kind:'use', ts: new Date().toISOString()
+      });
+      app.status = 'approved';
+      app.decidedBy = currentAdminName || '';
+      app.decidedAt = new Date().toISOString();
+      await saveLeaveRequests();
+      await saveLeaveApplications();
+      renderLeaveApprovals();
+      renderLeave();
+      renderDashboardStats();
+      showToast('승인 처리됐어요.');
+    });
+  });
+  tbody.querySelectorAll('.reject-leave-app').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const app = leaveApplications.find(a=>a.id===btn.dataset.id);
+      if(!app) return;
+      if(!canDecideLeaveApplication(app)){
+        showToast('대표님이 부여한 연월차 승인 권한이 있고 같은 팀인 경우에만 거절할 수 있어요.');
+        renderLeaveApprovals();
+        return;
+      }
+      const ok = await askConfirm(app.name+' 님의 연차 신청을 거절할까요?');
+      if(!ok) return;
+      app.status = 'rejected';
+      app.decidedBy = currentAdminName || '';
+      app.decidedAt = new Date().toISOString();
+      await saveLeaveApplications();
+      renderLeaveApprovals();
+      renderDashboardStats();
+      showToast('거절 처리됐어요.');
+    });
+  });
+}
+
+function openLeaveDetail(name){
+  leaveDetailTargetName = name;
+  document.getElementById('leaveDetailName').textContent = name+' 님 휴가 사용 내역';
+  const today = dateKey(new Date());
+  document.getElementById('leaveEntryStartDate').value = today;
+  document.getElementById('leaveEntryEndDate').value = today;
+  document.getElementById('leaveEntryAdjustDate').value = today;
+  document.getElementById('leaveEntryReason').value = '';
+  document.getElementById('leaveEntryKind').value = 'use';
+  document.getElementById('leaveEntryAmount').value = '';
+  document.getElementById('leaveEntryAdjustAmount').value = '';
+  pendingLeavePhoto = null;
+  document.getElementById('leaveEntryPhoto').value = '';
+  document.getElementById('leaveEntryPhotoPreview').classList.add('hidden');
+  updateLeaveEntryUI();
+  renderLeaveDetailList();
+  document.getElementById('leaveDetailOverlay').classList.remove('hidden');
+}
+function closeLeaveDetail(){
+  document.getElementById('leaveDetailOverlay').classList.add('hidden');
+  leaveDetailTargetName = null;
+}
+
+function renderLeaveDetailList(){
+  const el = document.getElementById('leaveDetailList');
+  const emp = employees.find(e=>e.name===leaveDetailTargetName);
+  const start = emp && leaveAnchorDate(emp) ? cycleStartFor(leaveAnchorDate(emp)) : null;
+  const entries = leaveRequests
+    .filter(r=>r.name===leaveDetailTargetName)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  if(entries.length===0){
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;">사용 내역이 없어요.</div>';
+    return;
+  }
+  el.innerHTML = entries.map(r=>{
+    const inCycle = start ? new Date(r.date+'T00:00:00') >= start : true;
+    const kind = entryKind(r);
+    const badge = kind==='adjust'
+      ? `<span class="dept-pill" style="background:var(--out-clay-soft);color:var(--out-clay);">조정</span>`
+      : `<span class="dept-pill">사용</span>`;
+    const amountLabel = kind==='adjust' ? `${r.amount>0?'+':''}${r.amount}일` : `${r.amount}일`;
+    const dateLabel = (r.endDate && r.endDate !== r.date) ? `${r.date} ~ ${r.endDate}` : r.date;
+    const deleteEntryButton = canManageLeaveRecords(leaveDetailTargetName)
+      ? `<button class="rm-leave-entry" data-id="${r.id}" type="button" style="border:none;background:transparent;color:var(--out-clay);font-size:12px;cursor:pointer;">삭제</button>`
+      : '';
+    return `<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;${inCycle?'':'opacity:0.45;'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+        <span style="display:flex;align-items:center;gap:6px;">${badge}<span class="num" style="font-weight:700;">${dateLabel} · ${amountLabel}</span></span>
+        ${deleteEntryButton}
+      </div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">${escapeHtml(r.reason||'(사유 없음)')}</div>
+      ${r.photo ? `<img src="${r.photo}" class="leave-photo-thumb" data-full="${r.photo}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-top:6px;cursor:pointer;border:1px solid var(--line);">` : ''}
+      ${inCycle?'':'<div style="font-size:10px;color:var(--muted);margin-top:2px;">이전 주기 기록</div>'}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.rm-leave-entry').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!canManageLeaveRecords(leaveDetailTargetName)){
+        showToast('연월차 승인 권한이 있고 같은 팀인 경우에만 연차 기록을 삭제할 수 있어요.');
+        renderLeaveDetailList();
+        return;
+      }
+      const ok = await askConfirm('이 사용 내역을 삭제할까요?');
+      if(!ok) return;
+      leaveRequests = leaveRequests.filter(r=>r.id!==btn.dataset.id);
+      await saveLeaveRequests();
+      renderLeaveDetailList();
+      renderLeave();
+    });
+  });
+  el.querySelectorAll('.leave-photo-thumb').forEach(img=>{
+    img.addEventListener('click', ()=>openPhotoView(img.dataset.full));
+  });
+}
+
+async function saveLeaveRequests(){
+  await storeSet('leave-requests', JSON.stringify(leaveRequests));
+}
+async function saveLeaveApplications(){
+  await storeSet('leave-applications', JSON.stringify(leaveApplications));
+}
+
+function renderAdmin(){
+  renderEmpList();
+  renderAdminLog();
+  renderLeave();
+  renderLeaveApprovals();
+
+  const deptFilter = document.getElementById('deptFilter');
+  const prevDept = deptFilter.value;
+  deptFilter.innerHTML = '<option value="">전체 부서</option>' +
+    DEPTS.map(d=>`<option value="${d}">${d}</option>`).join('');
+  deptFilter.value = prevDept;
+
+  refreshFilterDropdowns();
+
+  document.getElementById('newEmpDept').innerHTML = deptOptionsHtml(DEPTS[0]);
+  document.getElementById('newEmpType').innerHTML = empTypeOptionsHtml('정규직');
+  document.getElementById('newEmpPosition').innerHTML = positionOptionsHtml('사원');
+
+  renderTable();
+}
+
+function openLogEdit(date, name){
+  if(!hasLogEditPermission()){
+    showToast('대표님이 부여한 권한이 있어야 편집할 수 있어요.');
+    return;
+  }
+  logEditTarget = {date, name};
+  const dayEvents = log.filter(ev=>ev.name===name && localDateKey(ev.ts)===date);
+  const inEv = dayEvents.filter(ev=>ev.type==='in').sort((a,b)=>a.ts.localeCompare(b.ts))[0];
+  const outEv = dayEvents.filter(ev=>ev.type==='out').sort((a,b)=>b.ts.localeCompare(a.ts))[0];
+  document.getElementById('logEditTitle').textContent = date+' · '+name;
+  document.getElementById('logEditInTime').value = inEv ? timeLabel(new Date(inEv.ts)) : '';
+  document.getElementById('logEditOutTime').value = outEv ? timeLabel(new Date(outEv.ts)) : '';
+  document.getElementById('logEditOverlay').classList.remove('hidden');
+}
+function closeLogEdit(){
+  document.getElementById('logEditOverlay').classList.add('hidden');
+  logEditTarget = null;
+}
+
+function openLogAdd(){
+  if(!hasLogEditPermission()){
+    showToast('대표님이 부여한 권한이 있어야 기록을 추가할 수 있어요.');
+    return;
+  }
+  const list = document.getElementById('logAddEmpList');
+  list.innerHTML = sortByDeptName(employees).map(e=>`<option value="${escapeHtml(e.name)}">${escapeHtml(e.position||'사원')} / ${escapeHtml(e.dept)}</option>`).join('');
+  document.getElementById('logAddEmpInput').value = '';
+  document.getElementById('logAddDate').value = dateKey(new Date());
+  document.getElementById('logAddInTime').value = '';
+  document.getElementById('logAddOutTime').value = '';
+  document.getElementById('logAddOverlay').classList.remove('hidden');
+  setTimeout(()=>{ document.getElementById('logAddEmpInput').focus(); }, 50);
+}
+function closeLogAdd(){
+  document.getElementById('logAddOverlay').classList.add('hidden');
+}
+
+function applyLogEntry(name, date, inVal, outVal){
+  log = log.filter(ev => !(ev.name===name && localDateKey(ev.ts)===date && (ev.type==='in' || ev.type==='out')));
+  if(inVal){
+    const [hh, mm] = inVal.split(':').map(Number);
+    const d = new Date(date+'T00:00:00'); d.setHours(hh, mm, 0, 0);
+    log.push({name, type:'in', ts:d.toISOString()});
+  }
+  if(outVal){
+    const [hh, mm] = outVal.split(':').map(Number);
+    const d = new Date(date+'T00:00:00'); d.setHours(hh, mm, 0, 0);
+    log.push({name, type:'out', ts:d.toISOString()});
+  }
+}
+
+function renderTable(){
+  const monthKey = document.getElementById('monthPicker').value;
+  const specificDate = document.getElementById('dayPicker').value;
+  const empFilterVal = document.getElementById('empFilter').value;
+  const deptFilterVal = document.getElementById('deptFilter').value;
+  const rows = buildMonthRows(monthKey, empFilterVal, deptFilterVal, specificDate);
+  const tbody = document.getElementById('logTbody');
+  const emptyEl = document.getElementById('tableEmpty');
+  if(rows.length===0){
+    tbody.innerHTML='';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+  const canEditLogNow = hasLogEditPermission();
+  tbody.innerHTML = rows.map(r=>`
+    <tr data-date="${r.date}" data-name="${escapeHtml(r.name)}">
+      <td class="num">${r.date}</td>
+      <td><span class="dept-pill">${escapeHtml(r.dept)}</span></td>
+      <td>${escapeHtml(r.name)}</td>
+      <td class="num">${r.inTs ? timeLabel(new Date(r.inTs)) : '-'}</td>
+      <td class="num">${r.outTs ? timeLabel(new Date(r.outTs)) : '-'}</td>
+      <td class="num">${breakLabel(r)}</td>
+      <td class="num">${hoursLabel(r)}</td>
+      <td><div style="display:flex;gap:4px;align-items:center;">
+        ${canEditLogNow
+          ? `<button class="edit-log-row" type="button" title="이 날짜의 출퇴근 시간 편집">편집</button>`
+          : `<button class="edit-log-row" type="button" disabled title="대표님이 부여한 출퇴근 기록 편집 권한이 필요해요">편집</button>`}
+        ${canEditLogNow
+          ? `<button class="rm-log-row" type="button" title="이 기록 삭제">✕</button>`
+          : `<button class="rm-log-row" type="button" disabled title="대표님이 부여한 출퇴근 기록 편집 권한이 필요해요">✕</button>`}
+      </div></td>
+    </tr>`).join('');
+
+  tbody.querySelectorAll('.edit-log-row:not(:disabled)').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const tr = btn.closest('tr');
+      openLogEdit(tr.dataset.date, tr.dataset.name);
+    });
+  });
+
+  tbody.querySelectorAll('.rm-log-row:not(:disabled)').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!hasLogEditPermission()){
+        showToast('대표님이 부여한 출퇴근 기록 편집 권한이 필요해요.');
+        renderTable();
+        return;
+      }
+      const tr = btn.closest('tr');
+      const date = tr.dataset.date;
+      const name = tr.dataset.name;
+      const ok = await askConfirm(`${date} ${name} 님의 출퇴근 기록을 삭제할까요?`);
+      if(!ok) return;
+      log = log.filter(ev => !(ev.name===name && localDateKey(ev.ts)===date));
+      await saveLog();
+      showToast('기록이 삭제됐어요.');
+      renderTable();
+      renderKiosk();
+    });
+  });
+
+  const addBtn = document.getElementById('openLogAddBtn');
+  if(addBtn){
+    addBtn.disabled = !canEditLogNow;
+    addBtn.title = canEditLogNow ? '' : '대표님이 부여한 권한이 있어야 기록을 추가할 수 있어요';
+  }
+}
+
+function exportCsv(){
+  const monthKey = document.getElementById('monthPicker').value;
+  const specificDate = document.getElementById('dayPicker').value;
+  const empFilterVal = document.getElementById('empFilter').value;
+  const deptFilterVal = document.getElementById('deptFilter').value;
+  const rows = buildMonthRows(monthKey, empFilterVal, deptFilterVal, specificDate);
+  if(rows.length===0){ showToast('내보낼 기록이 없어요.'); return; }
+  const header = ['날짜','부서','이름','출근','퇴근','휴게(시간)','근무시간(시간)'];
+  const lines = [header.join(',')];
+  rows.forEach(r=>{
+    const w = computeWork(r);
+    lines.push([
+      r.date,
+      r.dept,
+      r.name,
+      r.inTs ? timeLabel(new Date(r.inTs)) : '',
+      r.outTs ? timeLabel(new Date(r.outTs)) : '',
+      w.gross!==null ? w.brk.toFixed(2) : '',
+      w.net!==null ? w.net.toFixed(2) : ''
+    ].join(','));
+  });
+  const blob = new Blob(['\uFEFF'+lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `근태기록_${specificDate || monthKey || '전체'}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+const HEADER_FILL = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9EAD3'} };
+
+async function exportXlsxTemplate(){
+  if(typeof ExcelJS === 'undefined'){ showToast('엑셀 라이브러리를 아직 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); return; }
+  const monthKey = document.getElementById('monthPicker').value;
+  if(!monthKey){ showToast('월을 선택해주세요.'); return; }
+  if(employees.length===0){ showToast('등록된 직원이 없어요.'); return; }
+
+  const [yearStr, monStr] = monthKey.split('-');
+  const year = parseInt(yearStr,10), month = parseInt(monStr,10);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const allRows = buildMonthRows(monthKey, '', '');
+
+  const wb = new ExcelJS.Workbook();
+  const usedNames = {};
+
+  employees.forEach(emp=>{
+    let sheetName = emp.name.slice(0,31);
+    if(usedNames[sheetName]){ usedNames[sheetName]++; sheetName = (sheetName.slice(0,28)+'_'+usedNames[sheetName]); }
+    else{ usedNames[sheetName]=1; }
+    const ws = wb.addWorksheet(sheetName);
+    ws.columns = [{width:16},{width:9},{width:9},{width:9},{width:12},{width:16}];
+
+    ws.getCell('A1').value = '이름';
+    ws.getCell('B1').value = emp.name;
+    ws.getCell('E1').value = '입사 일자';
+    ws.getCell('A2').value = '파트명';
+    ws.getCell('B2').value = emp.dept;
+    ws.getCell('E2').value = '퇴사 일자';
+    ws.getCell('A3').value = '연락처';
+    ws.getCell('E3').value = '이메일';
+    ['A1','A2','A3','E1','E2','E3'].forEach(addr=>{
+      const c = ws.getCell(addr);
+      c.font = { bold:true };
+      c.fill = HEADER_FILL;
+    });
+
+    const headerRow = ws.getRow(4);
+    headerRow.values = ['날짜','출근','퇴근','휴게','총 근무시간','비고'];
+    headerRow.eachCell(c=>{ c.font={bold:true}; c.fill=HEADER_FILL; c.alignment={horizontal:'center'}; });
+
+    const empRows = allRows.filter(r=>r.name===emp.name);
+    const byDate = {};
+    empRows.forEach(r=>{ byDate[r.date]=r; });
+
+    // 이번 달 연차/반차/반반차 "사용" 내역을 날짜별로 펼쳐서 매핑
+    const leaveByDate = {};
+    leaveRequests
+      .filter(r=>r.name===emp.name && (r.kind||'use')==='use')
+      .forEach(r=>{
+        const start = r.date;
+        const end = r.endDate || r.date;
+        if(start === end){
+          let label, hours;
+          if(r.amount === 0.5){ label='반차 사용'; hours=4; }
+          else if(r.amount === 0.25){ label='반반차 사용'; hours=6; }
+          else { label='연차 사용'; hours=8; }
+          if(monthKeyOf(start)===monthKey) leaveByDate[start] = {label, hours};
+        } else {
+          // 여러 날짜에 걸친 사용은 하루하루 전부 종일 연차로 처리
+          let cur = new Date(start+'T00:00:00');
+          const endD = new Date(end+'T00:00:00');
+          while(cur <= endD){
+            const dk = dateKey(cur);
+            if(monthKeyOf(dk)===monthKey) leaveByDate[dk] = {label:'연차 사용', hours:8};
+            cur.setDate(cur.getDate()+1);
+          }
+        }
+      });
+
+    const startRow = 5;
+    let rowIdx = startRow;
+    for(let d=1; d<=daysInMonth; d++){
+      const dk = `${year}-${pad(month)}-${pad(d)}`;
+      const row = ws.getRow(rowIdx);
+      row.getCell(1).value = new Date(Date.UTC(year, month-1, d));
+      row.getCell(1).numFmt = 'mm"월"dd"일" ddd';
+
+      const leaveInfo = leaveByDate[dk];
+      if(leaveInfo){
+        row.getCell(5).value = leaveInfo.hours / 24;
+        row.getCell(5).numFmt = 'h:mm';
+        row.getCell(6).value = leaveInfo.label;
+        rowIdx++;
+        continue;
+      }
+
+      const dayRow = byDate[dk];
+      const w = dayRow ? computeWork(dayRow) : {gross:null, brk:0, net:null};
+
+      if(dayRow && dayRow.inTs){
+        const t = new Date(dayRow.inTs);
+        row.getCell(2).value = (t.getHours()*60 + t.getMinutes()) / 1440;
+        row.getCell(2).numFmt = 'h:mm';
+      }
+      if(dayRow && dayRow.outTs){
+        const t = new Date(dayRow.outTs);
+        row.getCell(3).value = (t.getHours()*60 + t.getMinutes()) / 1440;
+        row.getCell(3).numFmt = 'h:mm';
+      }
+      if(w.gross!==null){
+        row.getCell(4).value = w.brk / 24; // 0시간, 0.5시간(30분), 1시간 중 하나
+        row.getCell(4).numFmt = 'h:mm';
+        row.getCell(5).value = { formula: `C${rowIdx}-B${rowIdx}-D${rowIdx}` };
+      } else {
+        row.getCell(5).value = 0;
+      }
+      row.getCell(5).numFmt = 'h:mm';
+      rowIdx++;
+    }
+    const endRow = rowIdx-1;
+    const totalRow = ws.getRow(rowIdx);
+    totalRow.getCell(1).value = '총 근무시간';
+    totalRow.getCell(5).value = { formula: `SUM(E${startRow}:E${endRow})` };
+    totalRow.getCell(5).numFmt = '[h]:mm';
+    totalRow.eachCell(c=>{ c.font={bold:true}; c.fill=HEADER_FILL; });
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `출근기록부_${monthKey}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('다운로드됐어요.');
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  ['dashboard','kiosk','closing','admin'].forEach(name=>{
+    const view = document.getElementById(name+'View');
+    if(view) view.classList.toggle('hidden', name!==tab);
+  });
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='kiosk') renderKiosk();
+  if(tab==='closing') renderClosingReports();
+  if(tab==='admin') renderAdmin();
+}
+
+const OWNER_NAME = '대표님';
+const OWNER_PASSWORD = '240810';
+
+async function requestAdminAccess(){
+  const actor = dashboardActor();
+  if(actor && actorHasAnyAdminPermission(actor)){
+    if(!adminUnlocked || currentAdminName!==actor){
+      adminUnlocked = true;
+      currentAdminName = actor;
+      await logAdminAccess(actor);
+    }
+    switchTab('admin');
+    return;
+  }
+  if(adminUnlocked){ switchTab('admin'); return; }
+  const input = document.getElementById('adminDobInput');
+  input.value='';
+  document.getElementById('adminLoginOverlay').classList.remove('hidden');
+  setTimeout(()=>input.focus(), 50);
+}
+function closeAdminLogin(){
+  document.getElementById('adminLoginOverlay').classList.add('hidden');
+}
+
+function hasLogEditPermission(){
+  // 대표님은 로그인 경로와 관계없이 항상 출퇴근 기록을 편집할 수 있어요.
+  const dashboardName = dashboardActor();
+  if(currentAdminName === OWNER_NAME || dashboardName === OWNER_NAME) return true;
+
+  // 관리자 화면에 진입한 계정을 우선하고, 없으면 현재 로그인한 사용자를 확인해요.
+  const actorName = (adminUnlocked && currentAdminName) ? currentAdminName : dashboardName;
+  const emp = employees.find(e=>e.name===actorName);
+  return !!(emp && emp.canEditLog === true);
+}
+
+async function attemptAdminLogin(){
+  const password = document.getElementById('adminDobInput').value.trim();
+  if(!/^\d{6}$/.test(password)){ showToast('비밀번호 6자리를 입력해주세요.'); return; }
+
+  let name = '';
+  if(password === OWNER_PASSWORD){
+    name = OWNER_NAME;
+  }else{
+    const matches = employees.filter(e =>
+      (e.canEditLog === true || e.canApproveLeave === true) &&
+      !!e.dob && e.dob === password
+    );
+    if(matches.length === 0){
+      showToast('등록된 관리자 비밀번호가 아니에요.');
+      document.getElementById('adminDobInput').value='';
+      return;
+    }
+    if(matches.length > 1){
+      showToast('같은 생년월일을 가진 권한자가 둘 이상이라 로그인할 수 없어요. 대표님이 직원 정보를 확인해주세요.');
+      document.getElementById('adminDobInput').value='';
+      return;
+    }
+    name = matches[0].name;
+  }
+
+  adminUnlocked = true;
+  currentAdminName = name;
+  sessionStorage.setItem('dashboard-actor', name);
+  renderDashboardUserState();
+  await logAdminAccess(name);
+  closeAdminLogin();
+  switchTab('admin');
+  showToast(name+' 님, 관리자 모드로 접속했어요.');
+}
+
+async function logAdminAccess(name){
+  const todayStr = dateKey(new Date());
+  adminLogins = adminLogins.filter(r=>dateKey(new Date(r.ts))===todayStr);
+  adminLogins.push({name, ts: new Date().toISOString()});
+  await storeSet('admin-logins', JSON.stringify(adminLogins));
+  renderAdminLog();
+}
+
+function renderAdminLog(){
+  const el = document.getElementById('adminLogList');
+  if(!el) return;
+  const todayStr = dateKey(new Date());
+  const todays = adminLogins.filter(r=>dateKey(new Date(r.ts))===todayStr);
+  if(todays.length===0){
+    el.innerHTML = '<li style="color:var(--muted);background:transparent;">오늘 접속 기록이 없어요</li>';
+    return;
+  }
+  const recent = todays.slice().reverse();
+  el.innerHTML = recent.map(r=>{
+    const d = new Date(r.ts);
+    const label = d.toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    return `<li style="flex-direction:row;justify-content:space-between;align-items:center;">
+      <span>${escapeHtml(r.name)}</span>
+      <span class="num" style="color:var(--muted);font-size:12px;">${label}</span>
+    </li>`;
+  }).join('');
+}
+
+function isEditingEmpUI(){
+  const active = document.activeElement;
+  return !!(active && active.closest && (
+    active.closest('#empList') ||
+    ['newEmpName','newEmpDept','newEmpType','newEmpPosition','newEmpDob','newEmpHireDate','quickAddInput','quickAddDept','quickAddType','quickAddPosition','quickAddDob','quickAddHireDate'].includes(active.id)
+  ));
+}
+
+function setupRealtimeSync(){
+  if(!fbDb) return;
+  fbDb.ref('att-employees').on('value', snap=>{
+    if(!snap.exists() || isEditingEmpUI()) return;
+    try{
+      const raw = JSON.parse(snap.val());
+      const next = raw.map(item => typeof item === 'string' ? {name:item, dept:'기타'} : item);
+      if(JSON.stringify(next) === JSON.stringify(employees)) return;
+      employees = next;
+      localStorage.setItem('att-employees', JSON.stringify(employees));
+      renderKiosk();
+      renderAdmin();
+      renderDashboard();
+      renderClosingReports();
+    }catch(err){ console.error(err); }
+  });
+  fbDb.ref('att-log').on('value', snap=>{
+    if(!snap.exists()) return;
+    try{
+      const next = JSON.parse(snap.val());
+      if(JSON.stringify(next) === JSON.stringify(log)) return;
+      log = next;
+      localStorage.setItem('att-log', JSON.stringify(log));
+      renderKiosk();
+      renderTable();
+      renderDashboardStats();
+    }catch(err){ console.error(err); }
+  });
+  fbDb.ref('admin-logins').on('value', snap=>{
+    if(!snap.exists()) return;
+    try{
+      adminLogins = JSON.parse(snap.val());
+      localStorage.setItem('admin-logins', JSON.stringify(adminLogins));
+      renderAdminLog();
+    }catch(err){ console.error(err); }
+  });
+  fbDb.ref('leave-requests').on('value', snap=>{
+    if(!snap.exists()) return;
+    try{
+      const next = JSON.parse(snap.val());
+      if(JSON.stringify(next) === JSON.stringify(leaveRequests)) return;
+      leaveRequests = next;
+      localStorage.setItem('leave-requests', JSON.stringify(leaveRequests));
+      renderLeave();
+      if(!document.getElementById('leaveDetailOverlay').classList.contains('hidden')) renderLeaveDetailList();
+    }catch(err){ console.error(err); }
+  });
+  fbDb.ref('leave-applications').on('value', snap=>{
+    if(!snap.exists()) return;
+    try{
+      const next = JSON.parse(snap.val());
+      if(JSON.stringify(next) === JSON.stringify(leaveApplications)) return;
+      leaveApplications = next;
+      localStorage.setItem('leave-applications', JSON.stringify(leaveApplications));
+      updatePendingBadges();
+      renderKiosk();
+      renderDashboardStats();
+      if(!document.getElementById('adminView').classList.contains('hidden')) renderLeaveApprovals();
+    }catch(err){ console.error(err); }
+  });
+  fbDb.ref('dashboard-posts').on('value', snap=>{
+    if(!snap.exists()) return;
+    try{
+      const raw = JSON.parse(snap.val());
+      const next = Array.isArray(raw) ? raw.filter(p=>p.type!=='closing').map(p=>({...p,likes:Array.isArray(p.likes)?p.likes:[],confirms:Array.isArray(p.confirms)?p.confirms:[],comments:Array.isArray(p.comments)?p.comments:[]})) : [];
+      if(JSON.stringify(next) === JSON.stringify(dashboardPosts)) return;
+      dashboardPosts = next;
+      localStorage.setItem('dashboard-posts', JSON.stringify(dashboardPosts));
+      if(!document.getElementById('dashboardView').classList.contains('hidden')) renderDashboard();
+    }catch(err){ console.error(err); }
+  });
+  fbDb.ref('closing-reports').on('value', snap=>{
+    if(!snap.exists()) return;
+    try{
+      const raw = JSON.parse(snap.val());
+      const next = Array.isArray(raw) ? raw.map(normalizeClosingReport) : [];
+      if(JSON.stringify(next) === JSON.stringify(closingReports)) return;
+      closingReports = next;
+      localStorage.setItem('closing-reports', JSON.stringify(closingReports));
+      renderDashboardStats();
+      if(!document.getElementById('closingView').classList.contains('hidden')) renderClosingReports();
+    }catch(err){ console.error(err); }
+  });
+}
+
+async function init(){
+  await loadAll();
+  if(employees.length===0){
+    employees = [
+      {name:'김현식',dept:'BOH',dob:'',employmentType:'정규직',regularSince:''},{name:'김보경',dept:'BOH',dob:'',employmentType:'정규직',regularSince:''},{name:'최현주',dept:'BOH',dob:'',employmentType:'정규직',regularSince:''},{name:'김찬주',dept:'BOH',dob:'',employmentType:'정규직',regularSince:''},{name:'석주빈',dept:'BOH',dob:'',employmentType:'정규직',regularSince:''},
+      {name:'김창우',dept:'FOH',dob:'',employmentType:'정규직',regularSince:''},{name:'최혜주',dept:'FOH',dob:'',employmentType:'정규직',regularSince:''},{name:'박상혁',dept:'FOH',dob:'',employmentType:'정규직',regularSince:''},{name:'황혜림',dept:'FOH',dob:'',employmentType:'정규직',regularSince:''},{name:'최혜륜',dept:'FOH',dob:'',employmentType:'정규직',regularSince:''},
+      {name:'신승호',dept:'베이커리',dob:'',employmentType:'정규직',regularSince:''},{name:'유보람',dept:'베이커리',dob:'',employmentType:'정규직',regularSince:''},{name:'유한별',dept:'베이커리',dob:'',employmentType:'정규직',regularSince:''},{name:'임은수',dept:'베이커리',dob:'',employmentType:'정규직',regularSince:''},
+      {name:'오혜주',dept:'마케팅',dob:'',employmentType:'정규직',regularSince:''}
+    ];
+    await saveEmployees();
+  }
+  document.getElementById('loadingMsg').classList.add('hidden');
+  document.getElementById('dashboardView').classList.remove('hidden');
+
+  const now = new Date();
+  document.getElementById('monthPicker').value = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  document.getElementById('dayPicker').value = '';
+  renderPeriodPicker();
+
+  renderClock();
+  setInterval(renderClock, 1000);
+  renderKiosk();
+  renderAdmin();
+  renderDashboard();
+  renderClosingReports();
+  setupRealtimeSync();
+
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      if(b.dataset.tab==='admin') requestAdminAccess();
+      else switchTab(b.dataset.tab);
+    });
+  });
+  document.getElementById('goAdminBtn').addEventListener('click', requestAdminAccess);
+
+  document.querySelectorAll('[data-go-tab]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const tab = btn.dataset.goTab;
+      if(tab==='admin') requestAdminAccess();
+      else switchTab(tab);
+    });
+  });
+  document.getElementById('dashboardLoginOpenBtn').addEventListener('click', ()=>openDashboardLogin());
+  document.getElementById('dashboardLogoutBtn').addEventListener('click', logoutDashboardActor);
+  document.getElementById('dashboardLoginSubmit').addEventListener('click', attemptDashboardLogin);
+  document.getElementById('dashboardLoginPassword').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); attemptDashboardLogin(); }
+  });
+  document.getElementById('dashboardLoginClose').addEventListener('click', closeDashboardLogin);
+  document.getElementById('dashboardLoginOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='dashboardLoginOverlay') closeDashboardLogin();
+  });
+  const runDashboardAction = (target)=>{
+    const actionTarget = target.closest('[data-dashboard-action]');
+    if(!actionTarget) return;
+    if(actionTarget.dataset.dashboardAction==='working-now') openWorkingNow();
+    if(actionTarget.dataset.dashboardAction==='pending-leave') openPendingLeaveApprovals();
+    if(actionTarget.dataset.dashboardAction==='closing') switchTab('closing');
+  };
+  document.getElementById('dashboardStats').addEventListener('click', (e)=>runDashboardAction(e.target));
+  document.getElementById('dashboardOverview').addEventListener('click', (e)=>runDashboardAction(e.target));
+  document.getElementById('workingNowClose').addEventListener('click', closeWorkingNow);
+  document.getElementById('workingNowOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='workingNowOverlay') closeWorkingNow();
+  });
+  document.getElementById('dashboardPostSubmit').addEventListener('click', createDashboardPost);
+  document.getElementById('dashboardPostBody').addEventListener('keydown', (e)=>{
+    if((e.ctrlKey || e.metaKey) && e.key==='Enter'){ e.preventDefault(); createDashboardPost(); }
+  });
+  document.getElementById('dashboardFeedFilter').addEventListener('change', renderDashboardFeed);
+  document.getElementById('dashboardFeed').addEventListener('click', (e)=>{
+    const likeBtn = e.target.closest('.like-post');
+    const confirmBtn = e.target.closest('.confirm-post');
+    const commentBtn = e.target.closest('.comment-submit');
+    const editBtn = e.target.closest('.edit-dashboard-post');
+    const deleteBtn = e.target.closest('.delete-dashboard-post');
+    if(likeBtn) toggleDashboardReaction(likeBtn.dataset.id, 'likes');
+    else if(confirmBtn) toggleDashboardReaction(confirmBtn.dataset.id, 'confirms');
+    else if(editBtn) openContentEdit('dashboard', editBtn.dataset.id);
+    else if(deleteBtn) deleteOwnedContent('dashboard', deleteBtn.dataset.id);
+    else if(commentBtn){
+      const input = Array.from(document.querySelectorAll('.comment-input')).find(el=>el.dataset.id===commentBtn.dataset.id);
+      addDashboardComment(commentBtn.dataset.id, input);
+    }
+  });
+  document.getElementById('dashboardFeed').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.target.classList.contains('comment-input')){
+      e.preventDefault();
+      addDashboardComment(e.target.dataset.id, e.target);
+    }
+  });
+  document.getElementById('closingLoginBtn').addEventListener('click', ()=>openDashboardLogin('closing'));
+  document.getElementById('closingReportSubmit').addEventListener('click', createClosingReport);
+  document.getElementById('closingReportBody').addEventListener('keydown', (e)=>{
+    if((e.ctrlKey || e.metaKey) && e.key==='Enter'){ e.preventDefault(); createClosingReport(); }
+  });
+  document.getElementById('closingReportList').addEventListener('click', (e)=>{
+    const editBtn = e.target.closest('.edit-closing-report');
+    const deleteBtn = e.target.closest('.delete-closing-report');
+    const likeBtn = e.target.closest('.like-closing-report');
+    const commentBtn = e.target.closest('.closing-comment-submit');
+    const photo = e.target.closest('.closing-report-photo');
+    if(editBtn) openContentEdit('closing', editBtn.dataset.id);
+    else if(deleteBtn) deleteOwnedContent('closing', deleteBtn.dataset.id);
+    else if(likeBtn) toggleClosingReportLike(likeBtn.dataset.id);
+    else if(commentBtn){
+      const input = Array.from(document.querySelectorAll('.closing-comment-input')).find(el=>el.dataset.id===commentBtn.dataset.id);
+      addClosingReportComment(commentBtn.dataset.id, input);
+    }else if(photo) openPhotoView(photo.dataset.full);
+  });
+  document.getElementById('closingReportList').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && e.target.classList.contains('closing-comment-input')){
+      e.preventDefault();
+      addClosingReportComment(e.target.dataset.id, e.target);
+    }
+  });
+  document.getElementById('closingReportPhoto').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      pendingClosingPhoto = await compressImageFile(file, 1000, 0.68);
+      document.getElementById('closingReportPhotoPreviewImg').src = pendingClosingPhoto;
+      document.getElementById('closingReportPhotoPreview').classList.remove('hidden');
+    }catch(err){
+      console.error(err);
+      showToast('사진을 처리하지 못했어요.');
+    }
+  });
+  document.getElementById('closingReportPhotoPreviewImg').addEventListener('click', ()=>{
+    if(pendingClosingPhoto) openPhotoView(pendingClosingPhoto);
+  });
+  document.getElementById('closingReportPhotoRemove').addEventListener('click', ()=>{
+    pendingClosingPhoto = null;
+    document.getElementById('closingReportPhoto').value = '';
+    document.getElementById('closingReportPhotoPreview').classList.add('hidden');
+  });
+  document.getElementById('contentEditSave').addEventListener('click', saveContentEdit);
+  document.getElementById('contentEditClose').addEventListener('click', closeContentEdit);
+  document.getElementById('contentEditOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='contentEditOverlay') closeContentEdit();
+  });
+  document.getElementById('contentEditPhoto').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      pendingContentEditPhoto = await compressImageFile(file, 1000, 0.68);
+      document.getElementById('contentEditPhotoPreviewImg').src = pendingContentEditPhoto;
+      document.getElementById('contentEditPhotoPreview').classList.remove('hidden');
+    }catch(err){
+      console.error(err);
+      showToast('사진을 처리하지 못했어요.');
+    }
+  });
+  document.getElementById('contentEditPhotoPreviewImg').addEventListener('click', ()=>{
+    if(pendingContentEditPhoto) openPhotoView(pendingContentEditPhoto);
+  });
+  document.getElementById('contentEditPhotoRemove').addEventListener('click', ()=>{
+    pendingContentEditPhoto = null;
+    document.getElementById('contentEditPhoto').value = '';
+    document.getElementById('contentEditPhotoPreview').classList.add('hidden');
+  });
+
+  document.getElementById('adminLoginBtn').addEventListener('click', attemptAdminLogin);
+  document.getElementById('adminDobInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); attemptAdminLogin(); }
+  });
+  document.getElementById('adminLoginClose').addEventListener('click', closeAdminLogin);
+  document.getElementById('adminLoginOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='adminLoginOverlay') closeAdminLogin();
+  });
+
+  const runAddEmp = async ()=>{
+    const input = document.getElementById('newEmpName');
+    const deptSel = document.getElementById('newEmpDept');
+    const typeSel = document.getElementById('newEmpType');
+    const posSel = document.getElementById('newEmpPosition');
+    const dobEl = document.getElementById('newEmpDob');
+    const hireDateEl = document.getElementById('newEmpHireDate');
+    const name = input.value.trim();
+    const dob = dobEl.value.trim();
+    const hireDate = hireDateEl.value;
+    if(!name){ showToast('이름을 입력해주세요.'); return; }
+    if(dob && !/^\d{6}$/.test(dob)){ showToast('생년월일은 6자리 숫자로 입력해주세요.'); return; }
+    if(!hireDate){ showToast('입사일을 선택해주세요.'); return; }
+    if(empNames().includes(name)){ showToast('이미 등록된 이름이에요.'); return; }
+    employees.push({name, dept: deptSel.value || '기타', dob, hireDate, employmentType: typeSel.value || '정규직', position: posSel.value || '사원', regularSince:''});
+    await saveEmployees();
+    input.value=''; dobEl.value=''; hireDateEl.value='';
+    renderAdmin(); renderKiosk(); renderDashboard();
+    showToast(name+' 님이 추가됐어요.');
+  };
+  document.getElementById('empSearch').addEventListener('input', renderEmpList);
+
+  document.getElementById('addEmpBtn').addEventListener('click', runAddEmp);
+  document.getElementById('newEmpName').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); runAddEmp(); }
+  });
+
+  const runQuickAdd = async ()=>{
+    const input = document.getElementById('quickAddInput');
+    const deptSel = document.getElementById('quickAddDept');
+    const typeSel = document.getElementById('quickAddType');
+    const posSel = document.getElementById('quickAddPosition');
+    const dobEl = document.getElementById('quickAddDob');
+    const hireDateEl = document.getElementById('quickAddHireDate');
+    const name = input.value.trim();
+    const dob = dobEl.value.trim();
+    const hireDate = hireDateEl.value;
+    if(!name){ showToast('이름을 입력해주세요.'); return; }
+    if(dob && !/^\d{6}$/.test(dob)){ showToast('생년월일은 6자리 숫자로 입력해주세요.'); return; }
+    if(!hireDate){ showToast('입사일을 선택해주세요.'); return; }
+    await submitQuickAdd(name, deptSel.value, dob, typeSel.value, posSel.value, hireDate);
+  };
+  document.getElementById('quickAddBtn').addEventListener('click', runQuickAdd);
+  document.getElementById('quickAddInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); runQuickAdd(); }
+  });
+  document.getElementById('quickAddClose').addEventListener('click', closeAddEmpModal);
+  document.getElementById('addEmpOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='addEmpOverlay') closeAddEmpModal();
+  });
+
+  document.getElementById('dobConfirmBtn').addEventListener('click', verifyDob);
+  document.getElementById('dobInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ e.preventDefault(); verifyDob(); }
+  });
+
+  document.getElementById('clockInBtn').addEventListener('click', ()=>punch('in'));
+  document.getElementById('clockOutBtn').addEventListener('click', ()=>punch('out'));
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modalOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='modalOverlay') closeModal();
+  });
+
+  document.getElementById('periodPickerBtn').addEventListener('click', ()=>{
+    const popover = document.getElementById('periodPickerPopover');
+    const btn = document.getElementById('periodPickerBtn');
+    const opening = popover.classList.contains('hidden');
+    popover.classList.toggle('hidden', !opening);
+    btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if(opening){
+      renderPeriodPicker();
+      setTimeout(()=>document.getElementById('monthPicker').focus(), 0);
+    }
+  });
+  document.getElementById('monthPicker').addEventListener('change', ()=>{
+    document.getElementById('dayPicker').value = '';
+    renderPeriodPicker();
+    renderTable();
+  });
+  document.getElementById('periodMonthAllBtn').addEventListener('click', ()=>{
+    document.getElementById('dayPicker').value = '';
+    renderPeriodPicker();
+    renderTable();
+    closePeriodPicker();
+  });
+  document.addEventListener('click', (e)=>{
+    const wrap = document.getElementById('periodPickerWrap');
+    if(wrap && !wrap.contains(e.target)) closePeriodPicker();
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key==='Escape') closePeriodPicker();
+  });
+  document.getElementById('empFilter').addEventListener('change', renderTable);
+  document.getElementById('deptFilter').addEventListener('change', ()=>{ renderAdmin(); });
+  document.getElementById('leaveDeptFilter').addEventListener('change', renderLeave);
+  document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+  document.getElementById('exportXlsxBtn').addEventListener('click', exportXlsxTemplate);
+
+  document.getElementById('logEditClose').addEventListener('click', closeLogEdit);
+  document.getElementById('logEditOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='logEditOverlay') closeLogEdit();
+  });
+  document.getElementById('logEditSaveBtn').addEventListener('click', async ()=>{
+    if(!hasLogEditPermission()){ showToast('대표님이 부여한 출퇴근 기록 편집 권한이 필요해요.'); closeLogEdit(); return; }
+    if(!logEditTarget) return;
+    const { date, name } = logEditTarget;
+    const inVal = document.getElementById('logEditInTime').value;
+    const outVal = document.getElementById('logEditOutTime').value;
+    applyLogEntry(name, date, inVal, outVal);
+    await saveLog();
+    closeLogEdit();
+    renderTable();
+    renderKiosk();
+    renderDashboardStats();
+    showToast('출퇴근 기록이 저장됐어요.');
+  });
+
+  document.getElementById('openLogAddBtn').addEventListener('click', openLogAdd);
+  document.getElementById('logAddClose').addEventListener('click', closeLogAdd);
+  document.getElementById('logAddOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='logAddOverlay') closeLogAdd();
+  });
+  document.getElementById('logAddSaveBtn').addEventListener('click', async ()=>{
+    if(!hasLogEditPermission()){ showToast('대표님이 부여한 출퇴근 기록 편집 권한이 필요해요.'); closeLogAdd(); return; }
+    const name = document.getElementById('logAddEmpInput').value.trim();
+    const date = document.getElementById('logAddDate').value;
+    const inVal = document.getElementById('logAddInTime').value;
+    const outVal = document.getElementById('logAddOutTime').value;
+    if(!name){ showToast('직원을 선택해주세요.'); return; }
+    if(!empNames().includes(name)){ showToast('직원 목록에 없는 이름이에요. 목록에서 검색해 선택해주세요.'); return; }
+    if(!date){ showToast('날짜를 선택해주세요.'); return; }
+    if(!inVal && !outVal){ showToast('출근 또는 퇴근 시간 중 하나는 입력해주세요.'); return; }
+    applyLogEntry(name, date, inVal, outVal);
+    await saveLog();
+    closeLogAdd();
+    renderTable();
+    renderKiosk();
+    renderDashboardStats();
+    showToast('기록이 추가됐어요.');
+  });
+
+  document.getElementById('openLeaveApplyBtn').addEventListener('click', ()=>{
+    const overlay = document.getElementById('modalOverlay');
+    openLeaveApply();
+    overlay.classList.add('hidden');
+  });
+  document.getElementById('leaveApplyClose').addEventListener('click', closeLeaveApply);
+  document.getElementById('leaveApplyOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='leaveApplyOverlay') closeLeaveApply();
+  });
+  document.getElementById('leaveApplyStart').addEventListener('change', ()=>{
+    const endEl = document.getElementById('leaveApplyEnd');
+    if(!endEl.value || endEl.value < document.getElementById('leaveApplyStart').value){
+      endEl.value = document.getElementById('leaveApplyStart').value;
+    }
+    updateLeaveApplyUI();
+  });
+  document.getElementById('leaveApplyEnd').addEventListener('change', updateLeaveApplyUI);
+  document.querySelectorAll('.leave-apply-kind-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      leaveApplyKind = btn.dataset.val;
+      document.querySelectorAll('.leave-apply-kind-btn').forEach(b=>b.classList.toggle('selected', b===btn));
+    });
+  });
+  document.getElementById('leaveApplySubmitBtn').addEventListener('click', submitLeaveApplication);
+
+  document.getElementById('leaveDetailClose').addEventListener('click', closeLeaveDetail);
+  document.getElementById('leaveDetailOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='leaveDetailOverlay') closeLeaveDetail();
+  });
+  document.getElementById('leaveEntryKind').addEventListener('change', updateLeaveEntryUI);
+  document.getElementById('leaveEntryStartDate').addEventListener('change', ()=>{
+    const endEl = document.getElementById('leaveEntryEndDate');
+    if(!endEl.value || endEl.value < document.getElementById('leaveEntryStartDate').value){
+      endEl.value = document.getElementById('leaveEntryStartDate').value;
+    }
+    updateLeaveEntryUI();
+  });
+  document.getElementById('leaveEntryEndDate').addEventListener('change', updateLeaveEntryUI);
+  document.querySelectorAll('.quick-amount-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.getElementById('leaveEntryAmount').value = btn.dataset.val;
+    });
+  });
+  document.getElementById('leaveEntryPhoto').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file){ return; }
+    try{
+      pendingLeavePhoto = await compressImageFile(file);
+      document.getElementById('leaveEntryPhotoPreviewImg').src = pendingLeavePhoto;
+      document.getElementById('leaveEntryPhotoPreview').classList.remove('hidden');
+    }catch(err){
+      console.error(err);
+      showToast('사진을 처리하지 못했어요.');
+    }
+  });
+  document.getElementById('leaveEntryPhotoRemove').addEventListener('click', ()=>{
+    pendingLeavePhoto = null;
+    document.getElementById('leaveEntryPhoto').value = '';
+    document.getElementById('leaveEntryPhotoPreview').classList.add('hidden');
+  });
+  document.getElementById('photoViewClose').addEventListener('click', closePhotoView);
+  document.getElementById('photoViewOverlay').addEventListener('click', (e)=>{
+    if(e.target.id==='photoViewOverlay') closePhotoView();
+  });
+
+  document.getElementById('leaveEntryAddBtn').addEventListener('click', async ()=>{
+    const kind = document.getElementById('leaveEntryKind').value;
+    const reason = document.getElementById('leaveEntryReason').value.trim();
+    if(!reason){ showToast('사유를 입력해주세요.'); return; }
+
+    let date, endDate, amount;
+    if(kind === 'adjust'){
+      date = document.getElementById('leaveEntryAdjustDate').value;
+      endDate = date;
+      amount = parseFloat(document.getElementById('leaveEntryAdjustAmount').value);
+    } else {
+      date = document.getElementById('leaveEntryStartDate').value;
+      endDate = document.getElementById('leaveEntryEndDate').value;
+      if(!date || !endDate){ showToast('날짜를 선택해주세요.'); return; }
+      const diffDays = Math.round((new Date(endDate+'T00:00:00') - new Date(date+'T00:00:00'))/86400000) + 1;
+      if(diffDays < 1){ showToast('종료일이 시작일보다 빠를 수 없어요.'); return; }
+      amount = diffDays === 1 ? parseFloat(document.getElementById('leaveEntryAmount').value) : diffDays;
+    }
+    if(!date){ showToast('날짜를 선택해주세요.'); return; }
+    if(isNaN(amount) || amount===0){ showToast('일수를 입력해주세요.'); return; }
+
+    leaveRequests.push({
+      id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+      name: leaveDetailTargetName, date, endDate, amount, reason, kind,
+      photo: pendingLeavePhoto || null, ts: new Date().toISOString()
+    });
+    await saveLeaveRequests();
+    const todayStr = dateKey(new Date());
+    document.getElementById('leaveEntryStartDate').value = todayStr;
+    document.getElementById('leaveEntryEndDate').value = todayStr;
+    document.getElementById('leaveEntryAdjustDate').value = todayStr;
+    document.getElementById('leaveEntryReason').value='';
+    document.getElementById('leaveEntryAmount').value='';
+    document.getElementById('leaveEntryAdjustAmount').value='';
+    pendingLeavePhoto = null;
+    document.getElementById('leaveEntryPhoto').value = '';
+    document.getElementById('leaveEntryPhotoPreview').classList.add('hidden');
+    updateLeaveEntryUI();
+    renderLeaveDetailList();
+    renderLeave();
+    showToast('사용 내역이 추가됐어요.');
+  });
+}
+
+init();
+</script>
+</body>
+</html>
